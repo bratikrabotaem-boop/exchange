@@ -61,9 +61,11 @@ button {
 </div>
 
 <script>
-const TIMEFRAME = 60_000;
-const LIQUIDITY = 1_000_000;
+/* ===== НАСТРОЙКИ ===== */
+const TIMEFRAME = 60_000;      // 1 минута
+const LIQUIDITY = 50_000;      // сделано наглядно
 
+/* ===== СОСТОЯНИЕ ===== */
 let balanceUSD = 100000;
 let balanceBTC = 0;
 let price = 30000;
@@ -71,6 +73,7 @@ let price = 30000;
 let currentCandle = null;
 let lastCandleTime = null;
 
+/* ===== UI ===== */
 const usdEl = document.getElementById('usd');
 const btcEl = document.getElementById('btc');
 const priceEl = document.getElementById('price');
@@ -82,6 +85,7 @@ function updateUI() {
 }
 updateUI();
 
+/* ===== ГРАФИК ===== */
 const chart = LightweightCharts.createChart(
   document.getElementById('chart'),
   {
@@ -109,12 +113,7 @@ const candleSeries = chart.addCandlestickSeries({
   wickDownColor: '#f6465d'
 });
 
-const volumeSeries = chart.addHistogramSeries({
-  priceScaleId: '',
-  priceFormat: { type: 'volume' },
-  scaleMargins: { top: 0.8, bottom: 0 }
-});
-
+/* ===== СВЕЧА ===== */
 function startNewCandle(time) {
   currentCandle = {
     time,
@@ -127,6 +126,7 @@ function startNewCandle(time) {
   };
 }
 
+/* ===== СДЕЛКА ===== */
 function recordTrade(orderUsd, side) {
   const delta = orderUsd / LIQUIDITY;
 
@@ -142,48 +142,36 @@ function recordTrade(orderUsd, side) {
     currentCandle.sellUsd += orderUsd;
   }
 
-  currentCandle.high = Math.max(currentCandle.high, price);
-  currentCandle.low  = Math.min(currentCandle.low, price);
+  // ТЕЛО СВЕЧИ
   currentCandle.close = price;
+
+  // ФИТИЛИ НЕ ОТ ТИКОВ
+  currentCandle.high = Math.max(currentCandle.open, currentCandle.close);
+  currentCandle.low  = Math.min(currentCandle.open, currentCandle.close);
 }
 
-function updateCandle() {
-  candleSeries.update(currentCandle);
-
-  const netVolume =
-    currentCandle.buyUsd - currentCandle.sellUsd;
-
-  volumeSeries.update({
-    time: currentCandle.time,
-    value: netVolume,
-    color: netVolume >= 0 ? '#0ecb81' : '#f6465d'
-  });
-}
-
+/* ===== BUY / SELL ===== */
 function trade(side) {
   const orderUsd = Number(amount.value);
   if (!orderUsd || orderUsd <= 0) return;
 
   const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
 
-  if (!lastCandleTime || now > lastCandleTime) {
+  if (!lastCandleTime) {
+    startNewCandle(now / 1000);
+    lastCandleTime = now;
+  }
+
+  if (now > lastCandleTime) {
+    candleSeries.update(currentCandle);
     startNewCandle(now / 1000);
     lastCandleTime = now;
   }
 
   recordTrade(orderUsd, side);
-  updateCandle();
+  candleSeries.update(currentCandle);
   updateUI();
 }
-
-setInterval(() => {
-  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
-  if (lastCandleTime && now > lastCandleTime) {
-    startNewCandle(now / 1000);
-    updateCandle();
-    lastCandleTime = now;
-  }
-}, TIMEFRAME);
 </script>
 
 </body>
