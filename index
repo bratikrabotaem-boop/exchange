@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Exchange Simulator</title>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0b0e11;
+  color: #eaecef;
+  font-family: Arial, sans-serif;
+}
+
+h2 {
+  margin: 10px;
+}
+
+#chart {
+  height: 420px;
+}
+
+#controls {
+  padding: 10px;
+  background: #0e1117;
+  display: flex;
+  gap: 6px;
+}
+
+input {
+  width: 100px;
+  background: #161a1e;
+  color: #eaecef;
+  border: 1px solid #2b3139;
+  padding: 6px;
+}
+
+button {
+  padding: 6px 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.buy {
+  background: #0ecb81;
+  color: #000;
+}
+
+.sell {
+  background: #f6465d;
+  color: #000;
+}
+
+#stats {
+  padding: 10px;
+  font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Exchange</h2>
+<div id="chart"></div>
+
+<div id="controls">
+  <input id="amount" type="number" value="1000" />
+  <button class="buy" onclick="trade('BUY')">BUY</button>
+  <button class="sell" onclick="trade('SELL')">SELL</button>
+</div>
+
+<div id="stats">
+  USD: <span id="usd"></span> |
+  BTC: <span id="btc"></span> |
+  Price: <span id="price"></span>
+</div>
+
+<script>
+/* ===== НАСТРОЙКИ ===== */
+const TIMEFRAME = 1000;
+const LIQUIDITY = 1_000_000;
+
+/* ===== СОСТОЯНИЕ ===== */
+let balanceUSD = 100000;
+let balanceBTC = 0;
+let price = 30000;
+
+let currentCandle = null;
+let lastCandleTime = null;
+
+/* ===== UI ===== */
+const usdEl = document.getElementById('usd');
+const btcEl = document.getElementById('btc');
+const priceEl = document.getElementById('price');
+
+function updateUI() {
+  usdEl.textContent = balanceUSD.toFixed(2);
+  btcEl.textContent = balanceBTC.toFixed(6);
+  priceEl.textContent = price.toFixed(2);
+}
+updateUI();
+
+/* ===== ГРАФИК ===== */
+const chart = LightweightCharts.createChart(
+  document.getElementById('chart'),
+  {
+    background: { color: '#0b0e11' },
+    textColor: '#d1d4dc',
+    grid: {
+      vertLines: { color: '#1e2329' },
+      horzLines: { color: '#1e2329' }
+    }
+  }
+);
+
+const candleSeries = chart.addCandlestickSeries({
+  upColor: '#0ecb81',
+  downColor: '#f6465d',
+  wickUpColor: '#0ecb81',
+  wickDownColor: '#f6465d'
+});
+
+const volumeSeries = chart.addHistogramSeries({
+  priceScaleId: '',
+  priceFormat: { type: 'volume' },
+  scaleMargins: { top: 0.8, bottom: 0 }
+});
+
+/* ===== СВЕЧИ ===== */
+function startNewCandle(time) {
+  currentCandle = {
+    time,
+    open: price,
+    high: price,
+    low: price,
+    close: price,
+    buyUsd: 0,
+    sellUsd: 0
+  };
+}
+
+function recordTrade(orderUsd, side) {
+  const delta = orderUsd / LIQUIDITY;
+
+  if (side === 'BUY') {
+    balanceUSD -= orderUsd;
+    balanceBTC += orderUsd / price;
+    price += delta;
+    currentCandle.buyUsd += orderUsd;
+  } else {
+    balanceBTC -= orderUsd / price;
+    balanceUSD += orderUsd;
+    price -= delta;
+    currentCandle.sellUsd += orderUsd;
+  }
+
+  currentCandle.high = Math.max(currentCandle.high, price);
+  currentCandle.low  = Math.min(currentCandle.low, price);
+  currentCandle.close = price;
+}
+
+function updateCandle() {
+  candleSeries.update(currentCandle);
+
+  const netVolume =
+    currentCandle.buyUsd - currentCandle.sellUsd;
+
+  volumeSeries.update({
+    time: currentCandle.time,
+    value: netVolume,
+    color: netVolume >= 0 ? '#0ecb81' : '#f6465d'
+  });
+}
+
+/* ===== ТОРГОВЛЯ ===== */
+function trade(side) {
+  const orderUsd = Number(amount.value);
+  if (!orderUsd || orderUsd <= 0) return;
+
+  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
+
+  if (!lastCandleTime || now > lastCandleTime) {
+    startNewCandle(now / 1000);
+    lastCandleTime = now;
+  }
+
+  recordTrade(orderUsd, side);
+  updateCandle();
+  updateUI();
+}
+
+/* ===== ПУСТЫЕ СВЕЧИ ===== */
+setInterval(() => {
+  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
+  if (lastCandleTime && now > lastCandleTime) {
+    startNewCandle(now / 1000);
+    updateCandle();
+    lastCandleTime = now;
+  }
+}, TIMEFRAME);
+</script>
+
+</body>
+</html>
