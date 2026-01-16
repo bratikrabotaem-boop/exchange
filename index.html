@@ -85,11 +85,19 @@ updateUI();
 const chart = LightweightCharts.createChart(
   document.getElementById('chart'),
   {
-    background: { color: '#0b0e11' },
-    textColor: '#d1d4dc',
+    layout: {
+      background: { color: '#0b0e11' },
+      textColor: '#eaecef'
+    },
     grid: {
-      vertLines: { color: '#1e2329' },
-      horzLines: { color: '#1e2329' }
+      vertLines: { color: '#0b0e11' },
+      horzLines: { color: '#0b0e11' }
+    },
+    rightPriceScale: {
+      borderColor: '#0b0e11'
+    },
+    timeScale: {
+      borderColor: '#0b0e11'
     }
   }
 );
