@@ -1,20 +1,20 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Exchange</title>
+<title>TEST 999</title>
 <style>
 body {
-  background: #0b0e11;
+  background: red;
   color: white;
-  font-family: Arial;
+  font-size: 32px;
 }
 </style>
 </head>
 <body>
 
-<h1>Exchange</h1>
-<p>GitHub Pages работает</p>
+<h1>TEST 999</h1>
+<p>ЕСЛИ ЭТО ВИДНО — PAGES ОБНОВИЛСЯ</p>
 
 </body>
 </html>
