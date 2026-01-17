@@ -180,9 +180,9 @@ function recordTrade(usd,side){
   currentCandle.close=price;
 
   volumeSeries.update({
-    time:currentCandle.time,
-    value:currentNetVolume/1e6,
-    color:currentNetVolume>=0?'#1faa59':'#d64545'
+    time: currentCandle.time + (2 * TIMEFRAME / 1000),
+    value: currentNetVolume / 1e6,
+    color: currentNetVolume >= 0 ? '#1faa59' : '#d64545'
   });
 }
 
