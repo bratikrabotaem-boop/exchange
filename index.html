@@ -1,46 +1,90 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>BTC/USD Simulator (5s)</title>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-      color: #ddd;
-      font-family: Arial;
-    }
-    #chart {
-      width: 100%;
-      height: 500px;
-    }
-    #controls {
-      padding: 10px;
-    }
-    input, button {
-      padding: 6px;
-      font-size: 14px;
-      margin-right: 5px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC/USD Simulator (5s)</title>
+
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #ddd;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+
+  h3 {
+    margin: 12px 0;
+  }
+
+  #chart {
+    width: 100%;
+    height: 55vh;
+  }
+
+  #controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 15px 0;
+  }
+
+  #amount {
+    width: 120px;
+    padding: 10px;
+    font-size: 18px;
+    text-align: center;
+    border-radius: 6px;
+    border: none;
+  }
+
+  button {
+    padding: 12px 22px;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .buy {
+    background: #1faa59;
+    color: #fff;
+  }
+
+  .sell {
+    background: #d64545;
+    color: #fff;
+  }
+
+  #stats {
+    margin-bottom: 12px;
+    font-size: 16px;
+  }
+</style>
 </head>
+
 <body>
 
-<h3 style="padding:10px">BTC/USD Simulator (5s)</h3>
+<h3>BTC/USD Simulator (5s)</h3>
+
 <div id="chart"></div>
 
 <div id="controls">
+  <button class="buy" onclick="trade('BUY')">BUY</button>
   <input id="amount" type="number" value="1000">
-  <button onclick="trade('BUY')">BUY</button>
-  <button onclick="trade('SELL')">SELL</button>
+  <button class="sell" onclick="trade('SELL')">SELL</button>
 </div>
 
-<p style="padding:10px">
+<div id="stats">
   USD: <span id="usd"></span> |
   BTC: <span id="btc"></span> |
   Price: <span id="price"></span>
-</p>
+</div>
 
 <script>
 /* ===== НАСТРОЙКИ ===== */
@@ -58,10 +102,9 @@ let lastCandleTime = null;
 
 /* ===== ГРАФИК ===== */
 const chartEl = document.getElementById('chart');
-
 const chart = LightweightCharts.createChart(chartEl, {
   width: chartEl.clientWidth,
-  height: 500,
+  height: chartEl.clientHeight,
   layout: { background: { color: '#111' }, textColor: '#ccc' },
   grid: { vertLines: { color: '#222' }, horzLines: { color: '#222' } }
 });
@@ -74,20 +117,19 @@ const volumeSeries = chart.addHistogramSeries({
 });
 
 window.addEventListener('resize', () => {
-  chart.applyOptions({ width: chartEl.clientWidth });
+  chart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
 });
 
 /* ===== UI ===== */
-const usd = document.getElementById('usd');
-const btc = document.getElementById('btc');
+const usdEl = document.getElementById('usd');
+const btcEl = document.getElementById('btc');
 const priceEl = document.getElementById('price');
 
 function updateUI() {
-  usd.textContent = balanceUSD.toFixed(2);
-  btc.textContent = balanceBTC.toFixed(6);
+  usdEl.textContent = balanceUSD.toFixed(2);
+  btcEl.textContent = balanceBTC.toFixed(6);
   priceEl.textContent = price.toFixed(2);
 }
-updateUI();
 
 /* ===== СВЕЧИ ===== */
 function startNewCandle(time) {
@@ -111,26 +153,33 @@ function ensureCandle() {
 }
 
 function updateCandle() {
+  if (!currentCandle) return;
   candleSeries.update(currentCandle);
+
   const net = currentCandle.buyUsd - currentCandle.sellUsd;
   volumeSeries.update({
     time: currentCandle.time,
     value: net,
-    color: net >= 0 ? 'green' : 'red'
+    color: net >= 0 ? '#1faa59' : '#d64545'
   });
 }
 
 /* ===== СДЕЛКИ ===== */
 function recordTrade(orderUsd, side) {
+  if (!currentCandle) return;
+
   const delta = orderUsd / LIQUIDITY;
 
   if (side === 'BUY') {
+    if (balanceUSD < orderUsd) return;
     balanceUSD -= orderUsd;
     balanceBTC += orderUsd / price;
     price += delta;
     currentCandle.buyUsd += orderUsd;
   } else {
-    balanceBTC -= orderUsd / price;
+    const btcAmount = orderUsd / price;
+    if (balanceBTC < btcAmount) return;
+    balanceBTC -= btcAmount;
     balanceUSD += orderUsd;
     price -= delta;
     currentCandle.sellUsd += orderUsd;
@@ -181,7 +230,13 @@ function marketTick() {
   lastPrice = price;
 }
 
-/* ===== ЗАПУСК ===== */
+/* ===== СТАРТ ===== */
+const startTime = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
+startNewCandle(startTime / 1000);
+lastCandleTime = startTime;
+updateCandle();
+updateUI();
+
 setInterval(marketTick, 300);
 </script>
 
