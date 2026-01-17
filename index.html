@@ -5,31 +5,18 @@
   <title>Crypto Candle Simulator</title>
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    body {
-      background: #111;
-      color: #ddd;
-      font-family: Arial;
-    }
-    #chart {
-      height: 500px;
-    }
-    #controls {
-      margin-top: 10px;
-    }
-    input, button {
-      padding: 6px;
-      font-size: 14px;
-      margin-right: 5px;
-    }
+    body { background:#111; color:#ddd; font-family:Arial }
+    #chart { height:500px }
+    input, button { padding:6px; font-size:14px; margin-right:5px }
   </style>
 </head>
 <body>
 
-<h3>BTC/USD Simulator</h3>
+<h3>BTC/USD Simulator (5s)</h3>
 <div id="chart"></div>
 
-<div id="controls">
-  <input id="amount" type="number" value="1000" />
+<div>
+  <input id="amount" type="number" value="1000">
   <button onclick="trade('BUY')">BUY</button>
   <button onclick="trade('SELL')">SELL</button>
 </div>
@@ -41,44 +28,45 @@
 </p>
 
 <script>
-/* ====== НАСТРОЙКИ ====== */
-const TIMEFRAME = 1000;        // 1 секунда
-const LIQUIDITY = 1_000_000;  // чем больше — тем меньше движение цены
+/* ===== НАСТРОЙКИ ===== */
+const TIMEFRAME = 5000;        // 5 секунд
+const LIQUIDITY = 1_000_000;
 
-/* ====== СОСТОЯНИЕ ====== */
+/* ===== СОСТОЯНИЕ ===== */
 let balanceUSD = 100000;
 let balanceBTC = 0;
 let price = 30000;
+let lastPrice = price;
 
 let currentCandle = null;
 let lastCandleTime = null;
 
-/* ====== ГРАФИК ====== */
+/* ===== ГРАФИК ===== */
 const chart = LightweightCharts.createChart(
   document.getElementById('chart'),
-  { background: { color: '#111' }, textColor: '#ccc' }
+  { background:{color:'#111'}, textColor:'#ccc' }
 );
 
 const candleSeries = chart.addCandlestickSeries();
 const volumeSeries = chart.addHistogramSeries({
-  priceScaleId: '',
-  priceFormat: { type: 'volume' },
-  scaleMargins: { top: 0.8, bottom: 0 }
+  priceScaleId:'',
+  priceFormat:{ type:'volume' },
+  scaleMargins:{ top:0.8, bottom:0 }
 });
 
-/* ====== ОБНОВЛЕНИЕ БАЛАНСА ====== */
+/* ===== UI ===== */
+const usd = document.getElementById('usd');
+const btc = document.getElementById('btc');
+const priceEl = document.getElementById('price');
+
 function updateUI() {
   usd.textContent = balanceUSD.toFixed(2);
   btc.textContent = balanceBTC.toFixed(6);
   priceEl.textContent = price.toFixed(2);
 }
-
-const usd = document.getElementById('usd');
-const btc = document.getElementById('btc');
-const priceEl = document.getElementById('price');
 updateUI();
 
-/* ====== НОВАЯ СВЕЧА ====== */
+/* ===== СВЕЧИ ===== */
 function startNewCandle(time) {
   currentCandle = {
     time,
@@ -91,7 +79,17 @@ function startNewCandle(time) {
   };
 }
 
-/* ====== ЗАПИСЬ СДЕЛКИ ====== */
+function updateCandle() {
+  candleSeries.update(currentCandle);
+  const net = currentCandle.buyUsd - currentCandle.sellUsd;
+  volumeSeries.update({
+    time: currentCandle.time,
+    value: net,
+    color: net >= 0 ? 'green' : 'red'
+  });
+}
+
+/* ===== СДЕЛКИ ===== */
 function recordTrade(orderUsd, side) {
   const delta = orderUsd / LIQUIDITY;
 
@@ -112,53 +110,57 @@ function recordTrade(orderUsd, side) {
   currentCandle.close = price;
 }
 
-/* ====== BUY / SELL ====== */
+/* ===== РУЧНАЯ ТОРГОВЛЯ ===== */
 function trade(side) {
   const orderUsd = Number(amount.value);
   if (!orderUsd || orderUsd <= 0) return;
 
-  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
-
-  if (!lastCandleTime || now > lastCandleTime) {
-    if (currentCandle) closeCandle();
-    startNewCandle(now / 1000);
-    lastCandleTime = now;
-  }
-
+  ensureCandle();
   recordTrade(orderUsd, side);
   updateCandle();
   updateUI();
 }
 
-/* ====== ОБНОВЛЕНИЕ СВЕЧИ ====== */
-function updateCandle() {
-  candleSeries.update(currentCandle);
-
-  const netVolume =
-    currentCandle.buyUsd - currentCandle.sellUsd;
-
-  volumeSeries.update({
-    time: currentCandle.time,
-    value: netVolume,
-    color: netVolume >= 0 ? 'green' : 'red'
-  });
+/* ===== ТОЛПА ===== */
+function randomCrowd() {
+  if (Math.random() > 0.6) return;
+  recordTrade(50 + Math.random()*300, Math.random()>0.5?'BUY':'SELL');
 }
 
-/* ====== ЗАКРЫТИЕ СВЕЧИ ====== */
-function closeCandle() {
-  updateCandle();
+function reactiveCrowd() {
+  const d = price - lastPrice;
+  if (Math.abs(d) < 5) return;
+  recordTrade(200 + Math.random()*800, d>0?'BUY':'SELL');
 }
 
-/* ====== ПУСТЫЕ СВЕЧИ (КАК НА БИРЖЕ) ====== */
-setInterval(() => {
-  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
+function momentumCrowd() {
+  const body = currentCandle.close - currentCandle.open;
+  if (Math.abs(body) < 10) return;
+  recordTrade(500 + Math.random()*1500, body>0?'BUY':'SELL');
+}
 
-  if (lastCandleTime && now > lastCandleTime) {
-    startNewCandle(now / 1000);
-    updateCandle();
+/* ===== ТИК РЫНКА ===== */
+function ensureCandle() {
+  const now = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
+  if (!lastCandleTime || now > lastCandleTime) {
+    if (currentCandle) updateCandle();
+    startNewCandle(now/1000);
     lastCandleTime = now;
   }
-}, TIMEFRAME);
+}
+
+function marketTick() {
+  ensureCandle();
+  randomCrowd();
+  reactiveCrowd();
+  momentumCrowd();
+  updateCandle();
+  updateUI();
+  lastPrice = price;
+}
+
+/* ===== ЗАПУСК ===== */
+setInterval(marketTick, 300);
 </script>
 
 </body>
