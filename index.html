@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>BTC/USD Simulator (5s)</title>
 
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<!-- НАДЁЖНЫЙ CDN -->
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
   body {
@@ -17,53 +19,47 @@
   }
 
   h3 {
-    margin: 12px 0;
+    margin: 14px 0;
   }
 
   #chart {
     width: 100%;
-    height: 55vh;
+    height: 420px;
+    min-height: 420px;
   }
 
   #controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 12px;
-    margin: 15px 0;
+    gap: 14px;
+    margin: 16px 0;
   }
 
   #amount {
     width: 120px;
-    padding: 10px;
-    font-size: 18px;
+    padding: 12px;
+    font-size: 20px;
     text-align: center;
-    border-radius: 6px;
+    border-radius: 8px;
     border: none;
   }
 
   button {
-    padding: 12px 22px;
-    font-size: 20px;
+    padding: 14px 26px;
+    font-size: 22px;
     font-weight: bold;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
   }
 
-  .buy {
-    background: #1faa59;
-    color: #fff;
-  }
-
-  .sell {
-    background: #d64545;
-    color: #fff;
-  }
+  .buy { background:#1faa59; color:#fff }
+  .sell { background:#d64545; color:#fff }
 
   #stats {
-    margin-bottom: 12px;
     font-size: 16px;
+    margin-bottom: 12px;
   }
 </style>
 </head>
@@ -102,22 +98,27 @@ let lastCandleTime = null;
 
 /* ===== ГРАФИК ===== */
 const chartEl = document.getElementById('chart');
+
 const chart = LightweightCharts.createChart(chartEl, {
   width: chartEl.clientWidth,
-  height: chartEl.clientHeight,
-  layout: { background: { color: '#111' }, textColor: '#ccc' },
-  grid: { vertLines: { color: '#222' }, horzLines: { color: '#222' } }
+  height: 420,
+  layout: { background: { color:'#111' }, textColor:'#ccc' },
+  grid: { vertLines:{color:'#222'}, horzLines:{color:'#222'} }
 });
 
 const candleSeries = chart.addCandlestickSeries();
 const volumeSeries = chart.addHistogramSeries({
-  priceScaleId: '',
-  priceFormat: { type: 'volume' },
-  scaleMargins: { top: 0.8, bottom: 0 }
+  priceScaleId:'',
+  priceFormat:{ type:'volume' },
+  scaleMargins:{ top:0.8, bottom:0 }
 });
 
+setTimeout(() => {
+  chart.applyOptions({ width: chartEl.clientWidth, height: 420 });
+}, 100);
+
 window.addEventListener('resize', () => {
-  chart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
+  chart.applyOptions({ width: chartEl.clientWidth });
 });
 
 /* ===== UI ===== */
@@ -167,7 +168,6 @@ function updateCandle() {
 /* ===== СДЕЛКИ ===== */
 function recordTrade(orderUsd, side) {
   if (!currentCandle) return;
-
   const delta = orderUsd / LIQUIDITY;
 
   if (side === 'BUY') {
@@ -194,7 +194,6 @@ function recordTrade(orderUsd, side) {
 function trade(side) {
   const orderUsd = Number(amount.value);
   if (!orderUsd || orderUsd <= 0) return;
-
   ensureCandle();
   recordTrade(orderUsd, side);
   updateCandle();
@@ -204,19 +203,19 @@ function trade(side) {
 /* ===== ТОЛПА ===== */
 function randomCrowd() {
   if (Math.random() > 0.6) return;
-  recordTrade(50 + Math.random() * 300, Math.random() > 0.5 ? 'BUY' : 'SELL');
+  recordTrade(50 + Math.random()*300, Math.random()>0.5?'BUY':'SELL');
 }
 
 function reactiveCrowd() {
   const d = price - lastPrice;
   if (Math.abs(d) < 5) return;
-  recordTrade(200 + Math.random() * 800, d > 0 ? 'BUY' : 'SELL');
+  recordTrade(200 + Math.random()*800, d>0?'BUY':'SELL');
 }
 
 function momentumCrowd() {
   const body = currentCandle.close - currentCandle.open;
   if (Math.abs(body) < 10) return;
-  recordTrade(500 + Math.random() * 1500, body > 0 ? 'BUY' : 'SELL');
+  recordTrade(500 + Math.random()*1500, body>0?'BUY':'SELL');
 }
 
 /* ===== РЫНОК ===== */
