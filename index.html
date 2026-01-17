@@ -16,11 +16,17 @@ body{
   font-family:Arial,sans-serif;
   text-align:center;
 }
+
 h3{margin:14px 0}
 
-#chart{
+#price{
   width:100%;
-  height:560px;
+  height:420px;
+}
+
+#volume{
+  width:100%;
+  height:140px;
 }
 
 #controls{
@@ -63,7 +69,8 @@ button{
 
 <h3>BTC/USD Simulator (5s) + Net Volume</h3>
 
-<div id="chart"></div>
+<div id="price"></div>
+<div id="volume"></div>
 
 <div id="controls">
   <button class="buy" onclick="trade('BUY')">BUY</button>
@@ -74,7 +81,7 @@ button{
 <div id="stats">
   USD: <span id="usd"></span> |
   BTC: <span id="btc"></span> |
-  Price: <span id="price"></span>
+  Price: <span id="priceText"></span>
 </div>
 
 <script>
@@ -92,18 +99,16 @@ let currentCandle = null;
 let lastCandleTime = null;
 let currentNetVolume = 0;
 
-/* ===== CHART ===== */
-const chartEl = document.getElementById('chart');
+/* ===== PRICE CHART ===== */
+const priceChart = LightweightCharts.createChart(
+  document.getElementById('price'),{
+    layout:{background:{color:'#111'},textColor:'#ccc'},
+    grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
+    rightPriceScale:{visible:false}
+  }
+);
 
-const chart = LightweightCharts.createChart(chartEl,{
-  width:chartEl.clientWidth,
-  height:560,
-  layout:{background:{color:'#111'},textColor:'#ccc'},
-  grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-  rightPriceScale:{visible:false}
-});
-
-const candleSeries = chart.addCandlestickSeries({
+const candleSeries = priceChart.addCandlestickSeries({
   upColor:'#1faa59',
   downColor:'#d64545',
   borderUpColor:'#1faa59',
@@ -112,21 +117,46 @@ const candleSeries = chart.addCandlestickSeries({
   wickDownColor:'#d64545'
 });
 
-const volumeSeries = chart.addHistogramSeries({
+/* ===== VOLUME CHART ===== */
+const volumeChart = LightweightCharts.createChart(
+  document.getElementById('volume'),{
+    layout:{background:{color:'#111'},textColor:'#ccc'},
+    grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
+    rightPriceScale:{visible:false},
+    leftPriceScale:{visible:false}
+  }
+);
+
+const volumeSeries = volumeChart.addHistogramSeries({
   base:0,
-  priceFormat:{type:'volume'},
-  priceScaleId:'',
-  scaleMargins:{top:0.75,bottom:0}
+  priceFormat:{type:'volume'}
 });
 
-window.addEventListener('resize',()=>{
-  chart.applyOptions({width:chartEl.clientWidth});
-});
+/* ===== SYNC ===== */
+let syncing = false;
+function syncCharts(a,b){
+  a.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+    if(syncing || !range) return;
+    syncing = true;
+    b.timeScale().setVisibleLogicalRange(range);
+    syncing = false;
+  });
+}
+syncCharts(priceChart, volumeChart);
+syncCharts(volumeChart, priceChart);
+
+/* ===== RESIZE ===== */
+function resize(){
+  priceChart.resize(price.clientWidth, price.clientHeight);
+  volumeChart.resize(volume.clientWidth, volume.clientHeight);
+}
+window.addEventListener('resize', resize);
+resize();
 
 /* ===== UI ===== */
 const usdEl = document.getElementById('usd');
 const btcEl = document.getElementById('btc');
-const priceEl = document.getElementById('price');
+const priceEl = document.getElementById('priceText');
 
 function updateUI(){
   usdEl.textContent = balanceUSD.toFixed(2);
@@ -161,7 +191,6 @@ function updateCandle(){
 /* ===== TRADES ===== */
 function recordTrade(orderUsd,side){
   if(!currentCandle) return;
-
   const delta = orderUsd / LIQUIDITY;
 
   if(side==='BUY'){
