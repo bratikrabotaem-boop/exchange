@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>BTC/USD Simulator + Net Volume (5s)</title>
+<title>BTC/USD Simulator + Net Volume</title>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -19,20 +19,12 @@ body{
 
 h3{margin:14px 0}
 
-#price{
-  width:100%;
-  height:420px;
-}
-
-#volume{
-  width:100%;
-  height:140px;
-}
+#price{width:100%;height:420px}
+#volume{width:100%;height:140px}
 
 #controls{
   display:flex;
   justify-content:center;
-  align-items:center;
   gap:14px;
   margin:16px 0;
 }
@@ -42,8 +34,6 @@ h3{margin:14px 0}
   padding:12px;
   font-size:20px;
   text-align:center;
-  border-radius:8px;
-  border:none;
 }
 
 button{
@@ -57,11 +47,6 @@ button{
 
 .buy{background:#1faa59;color:#fff}
 .sell{background:#d64545;color:#fff}
-
-#stats{
-  font-size:16px;
-  margin-bottom:12px;
-}
 </style>
 </head>
 
@@ -78,22 +63,16 @@ button{
   <button class="sell" onclick="trade('SELL')">SELL</button>
 </div>
 
-<div id="stats">
-  USD: <span id="usd"></span> |
-  BTC: <span id="btc"></span> |
-  Price: <span id="priceText"></span>
-</div>
-
 <script>
 /* ===== SETTINGS ===== */
 const TIMEFRAME = 5000;
 const LIQUIDITY = 1_000_000;
 
 /* ===== STATE ===== */
-let balanceUSD = 100000;
-let balanceBTC = 0;
 let price = 30000;
 let lastPrice = price;
+let balanceUSD = 100000;
+let balanceBTC = 0;
 
 let currentCandle = null;
 let lastCandleTime = null;
@@ -101,10 +80,12 @@ let currentNetVolume = 0;
 
 /* ===== PRICE CHART ===== */
 const priceChart = LightweightCharts.createChart(
-  document.getElementById('price'),{
+  document.getElementById('price'),
+  {
     layout:{background:{color:'#111'},textColor:'#ccc'},
     grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-    rightPriceScale:{visible:false}
+    rightPriceScale:{visible:false},
+    timeScale:{timeVisible:true,secondsVisible:false}
   }
 );
 
@@ -119,11 +100,13 @@ const candleSeries = priceChart.addCandlestickSeries({
 
 /* ===== VOLUME CHART ===== */
 const volumeChart = LightweightCharts.createChart(
-  document.getElementById('volume'),{
+  document.getElementById('volume'),
+  {
     layout:{background:{color:'#111'},textColor:'#ccc'},
     grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
     rightPriceScale:{visible:false},
-    leftPriceScale:{visible:false}
+    leftPriceScale:{visible:false},
+    timeScale:{timeVisible:true,secondsVisible:false}
   }
 );
 
@@ -133,41 +116,31 @@ const volumeSeries = volumeChart.addHistogramSeries({
 });
 
 /* ===== SYNC ===== */
-let syncing = false;
-function syncCharts(a,b){
-  a.timeScale().subscribeVisibleLogicalRangeChange(range=>{
-    if(syncing || !range) return;
-    syncing = true;
-    b.timeScale().setVisibleLogicalRange(range);
-    syncing = false;
+let syncing=false;
+function sync(a,b){
+  a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
+    if(syncing||!r) return;
+    syncing=true;
+    b.timeScale().setVisibleLogicalRange(r);
+    syncing=false;
   });
 }
-syncCharts(priceChart, volumeChart);
-syncCharts(volumeChart, priceChart);
+sync(priceChart,volumeChart);
+sync(volumeChart,priceChart);
 
 /* ===== RESIZE ===== */
 function resize(){
-  priceChart.resize(price.clientWidth, price.clientHeight);
-  volumeChart.resize(volume.clientWidth, volume.clientHeight);
+  priceChart.resize(priceEl.clientWidth,420);
+  volumeChart.resize(volumeEl.clientWidth,140);
 }
-window.addEventListener('resize', resize);
-resize();
-
-/* ===== UI ===== */
-const usdEl = document.getElementById('usd');
-const btcEl = document.getElementById('btc');
-const priceEl = document.getElementById('priceText');
-
-function updateUI(){
-  usdEl.textContent = balanceUSD.toFixed(2);
-  btcEl.textContent = balanceBTC.toFixed(6);
-  priceEl.textContent = price.toFixed(2);
-}
+const priceEl=document.getElementById('price');
+const volumeEl=document.getElementById('volume');
+window.addEventListener('resize',resize);
 
 /* ===== CANDLES ===== */
 function startNewCandle(time){
-  currentNetVolume = 0;
-  currentCandle = {
+  currentNetVolume=0;
+  currentCandle={
     time,
     open:price,
     high:price,
@@ -177,40 +150,39 @@ function startNewCandle(time){
 }
 
 function ensureCandle(){
-  const now = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
-  if(!lastCandleTime || now>lastCandleTime){
+  const now=Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
+  if(!lastCandleTime||now>lastCandleTime){
     startNewCandle(now/1000);
-    lastCandleTime = now;
+    lastCandleTime=now;
   }
 }
 
 function updateCandle(){
-  if(currentCandle) candleSeries.update(currentCandle);
+  candleSeries.update(currentCandle);
 }
 
 /* ===== TRADES ===== */
-function recordTrade(orderUsd,side){
-  if(!currentCandle) return;
-  const delta = orderUsd / LIQUIDITY;
+function recordTrade(usd,side){
+  const delta=usd/LIQUIDITY;
 
   if(side==='BUY'){
-    if(balanceUSD < orderUsd) return;
-    balanceUSD -= orderUsd;
-    balanceBTC += orderUsd / price;
-    price += delta;
-    currentNetVolume += orderUsd;
+    if(balanceUSD<usd) return;
+    balanceUSD-=usd;
+    balanceBTC+=usd/price;
+    price+=delta;
+    currentNetVolume+=usd;
   }else{
-    const btcAmount = orderUsd / price;
-    if(balanceBTC < btcAmount) return;
-    balanceBTC -= btcAmount;
-    balanceUSD += orderUsd;
-    price -= delta;
-    currentNetVolume -= orderUsd;
+    const btc=usd/price;
+    if(balanceBTC<btc) return;
+    balanceBTC-=btc;
+    balanceUSD+=usd;
+    price-=delta;
+    currentNetVolume-=usd;
   }
 
-  currentCandle.high = Math.max(currentCandle.high,price);
-  currentCandle.low  = Math.min(currentCandle.low,price);
-  currentCandle.close = price;
+  currentCandle.high=Math.max(currentCandle.high,price);
+  currentCandle.low=Math.min(currentCandle.low,price);
+  currentCandle.close=price;
 
   volumeSeries.update({
     time:currentCandle.time,
@@ -221,51 +193,37 @@ function recordTrade(orderUsd,side){
 
 /* ===== MANUAL ===== */
 function trade(side){
-  const orderUsd = Number(amount.value);
-  if(!orderUsd || orderUsd<=0) return;
   ensureCandle();
-  recordTrade(orderUsd,side);
+  recordTrade(+amount.value,side);
   updateCandle();
-  updateUI();
 }
 
 /* ===== CROWD ===== */
-function randomCrowd(){
-  if(Math.random()>0.6) return;
-  recordTrade(50+Math.random()*300,Math.random()>0.5?'BUY':'SELL');
+function crowd(){
+  if(Math.random()<0.6) return;
+  recordTrade(50+Math.random()*500,Math.random()>0.5?'BUY':'SELL');
 }
 
-function reactiveCrowd(){
-  const d = price-lastPrice;
-  if(Math.abs(d)<5) return;
-  recordTrade(200+Math.random()*800,d>0?'BUY':'SELL');
-}
-
-function momentumCrowd(){
-  const body = currentCandle.close-currentCandle.open;
-  if(Math.abs(body)<10) return;
-  recordTrade(500+Math.random()*1500,body>0?'BUY':'SELL');
-}
-
-/* ===== MARKET ===== */
-function marketTick(){
+/* ===== LOOP ===== */
+function tick(){
   ensureCandle();
-  randomCrowd();
-  reactiveCrowd();
-  momentumCrowd();
+  crowd();
   updateCandle();
-  updateUI();
-  lastPrice = price;
+  lastPrice=price;
 }
 
 /* ===== START ===== */
-const startTime = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
-startNewCandle(startTime/1000);
-lastCandleTime = startTime;
+const start=Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
+startNewCandle(start/1000);
+lastCandleTime=start;
 updateCandle();
-updateUI();
 
-setInterval(marketTick,300);
+/* 🔑 ВАЖНО */
+priceChart.timeScale().fitContent();
+volumeChart.timeScale().fitContent();
+resize();
+
+setInterval(tick,300);
 </script>
 
 </body>
