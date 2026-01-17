@@ -71,7 +71,7 @@ button{
 </div>
 
 <script>
-const TIMEFRAME = 5000;
+const TIMEFRAME = 10000;
 const LIQUIDITY = 1_000_000;
 
 let price = 30000;
@@ -196,7 +196,7 @@ function trade(side){
 /* CROWD */
 function crowd(){
   if(Math.random()<0.6) return;
-  recordTrade(50+Math.random()*500,'SELL');
+  recordTrade(50+Math.random()*500,'BUY');
 }
 
 /* LOOP */
