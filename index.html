@@ -17,31 +17,38 @@ body{
   text-align:center;
 }
 
-h3{margin:14px 0}
+h3{margin:12px 0}
 
-#price{width:100%;height:420px}
-#volume{width:100%;height:140px}
+#price{
+  width:100%;
+  height:320px;
+}
+
+#volume{
+  width:100%;
+  height:100px;
+}
 
 #controls{
   display:flex;
   justify-content:center;
   gap:14px;
-  margin:16px 0;
+  margin:12px 0;
 }
 
 #amount{
   width:120px;
-  padding:12px;
-  font-size:20px;
+  padding:10px;
+  font-size:18px;
   text-align:center;
 }
 
 button{
-  padding:14px 26px;
-  font-size:22px;
+  padding:12px 22px;
+  font-size:20px;
   font-weight:bold;
   border:none;
-  border-radius:10px;
+  border-radius:8px;
   cursor:pointer;
 }
 
@@ -52,7 +59,7 @@ button{
 
 <body>
 
-<h3>BTC/USD Simulator (5s) + Net Volume</h3>
+<h3>BTC/USD Simulator (5s)</h3>
 
 <div id="price"></div>
 <div id="volume"></div>
@@ -64,11 +71,9 @@ button{
 </div>
 
 <script>
-/* ===== SETTINGS ===== */
 const TIMEFRAME = 5000;
 const LIQUIDITY = 1_000_000;
 
-/* ===== STATE ===== */
 let price = 30000;
 let lastPrice = price;
 let balanceUSD = 100000;
@@ -78,16 +83,14 @@ let currentCandle = null;
 let lastCandleTime = null;
 let currentNetVolume = 0;
 
-/* ===== PRICE CHART ===== */
-const priceChart = LightweightCharts.createChart(
-  document.getElementById('price'),
-  {
-    layout:{background:{color:'#111'},textColor:'#ccc'},
-    grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-    rightPriceScale:{visible:false},
-    timeScale:{timeVisible:true,secondsVisible:false}
-  }
-);
+/* PRICE CHART */
+const priceEl = document.getElementById('price');
+const priceChart = LightweightCharts.createChart(priceEl,{
+  layout:{background:{color:'#111'},textColor:'#ccc'},
+  grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
+  rightPriceScale:{visible:false},
+  timeScale:{timeVisible:true,secondsVisible:false}
+});
 
 const candleSeries = priceChart.addCandlestickSeries({
   upColor:'#1faa59',
@@ -98,24 +101,25 @@ const candleSeries = priceChart.addCandlestickSeries({
   wickDownColor:'#d64545'
 });
 
-/* ===== VOLUME CHART ===== */
-const volumeChart = LightweightCharts.createChart(
-  document.getElementById('volume'),
-  {
-    layout:{background:{color:'#111'},textColor:'#ccc'},
-    grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-    rightPriceScale:{visible:false},
-    leftPriceScale:{visible:false},
-    timeScale:{timeVisible:true,secondsVisible:false}
-  }
-);
+/* VOLUME CHART */
+const volumeEl = document.getElementById('volume');
+const volumeChart = LightweightCharts.createChart(volumeEl,{
+  layout:{background:{color:'#111'},textColor:'#ccc'},
+  grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
+  rightPriceScale:{visible:false},
+  leftPriceScale:{visible:false},
+  timeScale:{timeVisible:true,secondsVisible:false}
+});
 
 const volumeSeries = volumeChart.addHistogramSeries({
   base:0,
-  priceFormat:{type:'volume'}
+  priceFormat:{
+    type:'custom',
+    formatter:v => v.toFixed(2) + 'M'
+  }
 });
 
-/* ===== SYNC ===== */
+/* SYNC */
 let syncing=false;
 function sync(a,b){
   a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
@@ -128,25 +132,17 @@ function sync(a,b){
 sync(priceChart,volumeChart);
 sync(volumeChart,priceChart);
 
-/* ===== RESIZE ===== */
+/* RESIZE */
 function resize(){
-  priceChart.resize(priceEl.clientWidth,420);
-  volumeChart.resize(volumeEl.clientWidth,140);
+  priceChart.resize(priceEl.clientWidth,320);
+  volumeChart.resize(volumeEl.clientWidth,100);
 }
-const priceEl=document.getElementById('price');
-const volumeEl=document.getElementById('volume');
 window.addEventListener('resize',resize);
 
-/* ===== CANDLES ===== */
+/* CANDLES */
 function startNewCandle(time){
   currentNetVolume=0;
-  currentCandle={
-    time,
-    open:price,
-    high:price,
-    low:price,
-    close:price
-  };
+  currentCandle={time,open:price,high:price,low:price,close:price};
 }
 
 function ensureCandle(){
@@ -161,10 +157,9 @@ function updateCandle(){
   candleSeries.update(currentCandle);
 }
 
-/* ===== TRADES ===== */
+/* TRADES */
 function recordTrade(usd,side){
   const delta=usd/LIQUIDITY;
-
   if(side==='BUY'){
     if(balanceUSD<usd) return;
     balanceUSD-=usd;
@@ -186,25 +181,25 @@ function recordTrade(usd,side){
 
   volumeSeries.update({
     time:currentCandle.time,
-    value:currentNetVolume,
+    value:currentNetVolume/1e6,
     color:currentNetVolume>=0?'#1faa59':'#d64545'
   });
 }
 
-/* ===== MANUAL ===== */
+/* MANUAL */
 function trade(side){
   ensureCandle();
   recordTrade(+amount.value,side);
   updateCandle();
 }
 
-/* ===== CROWD ===== */
+/* CROWD */
 function crowd(){
   if(Math.random()<0.6) return;
   recordTrade(50+Math.random()*500,Math.random()>0.5?'BUY':'SELL');
 }
 
-/* ===== LOOP ===== */
+/* LOOP */
 function tick(){
   ensureCandle();
   crowd();
@@ -212,13 +207,12 @@ function tick(){
   lastPrice=price;
 }
 
-/* ===== START ===== */
+/* START */
 const start=Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
 startNewCandle(start/1000);
 lastCandleTime=start;
 updateCandle();
 
-/* 🔑 ВАЖНО */
 priceChart.timeScale().fitContent();
 volumeChart.timeScale().fitContent();
 resize();
