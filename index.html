@@ -2,26 +2,41 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Crypto Candle Simulator</title>
+  <title>BTC/USD Simulator (5s)</title>
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    body { background:#111; color:#ddd; font-family:Arial }
-    #chart { height:500px }
-    input, button { padding:6px; font-size:14px; margin-right:5px }
+    body {
+      margin: 0;
+      background: #111;
+      color: #ddd;
+      font-family: Arial;
+    }
+    #chart {
+      width: 100%;
+      height: 500px;
+    }
+    #controls {
+      padding: 10px;
+    }
+    input, button {
+      padding: 6px;
+      font-size: 14px;
+      margin-right: 5px;
+    }
   </style>
 </head>
 <body>
 
-<h3>BTC/USD Simulator (5s)</h3>
+<h3 style="padding:10px">BTC/USD Simulator (5s)</h3>
 <div id="chart"></div>
 
-<div>
+<div id="controls">
   <input id="amount" type="number" value="1000">
   <button onclick="trade('BUY')">BUY</button>
   <button onclick="trade('SELL')">SELL</button>
 </div>
 
-<p>
+<p style="padding:10px">
   USD: <span id="usd"></span> |
   BTC: <span id="btc"></span> |
   Price: <span id="price"></span>
@@ -29,7 +44,7 @@
 
 <script>
 /* ===== НАСТРОЙКИ ===== */
-const TIMEFRAME = 5000;        // 5 секунд
+const TIMEFRAME = 5000;
 const LIQUIDITY = 1_000_000;
 
 /* ===== СОСТОЯНИЕ ===== */
@@ -42,16 +57,24 @@ let currentCandle = null;
 let lastCandleTime = null;
 
 /* ===== ГРАФИК ===== */
-const chart = LightweightCharts.createChart(
-  document.getElementById('chart'),
-  { background:{color:'#111'}, textColor:'#ccc' }
-);
+const chartEl = document.getElementById('chart');
+
+const chart = LightweightCharts.createChart(chartEl, {
+  width: chartEl.clientWidth,
+  height: 500,
+  layout: { background: { color: '#111' }, textColor: '#ccc' },
+  grid: { vertLines: { color: '#222' }, horzLines: { color: '#222' } }
+});
 
 const candleSeries = chart.addCandlestickSeries();
 const volumeSeries = chart.addHistogramSeries({
-  priceScaleId:'',
-  priceFormat:{ type:'volume' },
-  scaleMargins:{ top:0.8, bottom:0 }
+  priceScaleId: '',
+  priceFormat: { type: 'volume' },
+  scaleMargins: { top: 0.8, bottom: 0 }
+});
+
+window.addEventListener('resize', () => {
+  chart.applyOptions({ width: chartEl.clientWidth });
 });
 
 /* ===== UI ===== */
@@ -77,6 +100,14 @@ function startNewCandle(time) {
     buyUsd: 0,
     sellUsd: 0
   };
+}
+
+function ensureCandle() {
+  const now = Math.floor(Date.now() / TIMEFRAME) * TIMEFRAME;
+  if (!lastCandleTime || now > lastCandleTime) {
+    startNewCandle(now / 1000);
+    lastCandleTime = now;
+  }
 }
 
 function updateCandle() {
@@ -124,31 +155,22 @@ function trade(side) {
 /* ===== ТОЛПА ===== */
 function randomCrowd() {
   if (Math.random() > 0.6) return;
-  recordTrade(50 + Math.random()*300, Math.random()>0.5?'BUY':'SELL');
+  recordTrade(50 + Math.random() * 300, Math.random() > 0.5 ? 'BUY' : 'SELL');
 }
 
 function reactiveCrowd() {
   const d = price - lastPrice;
   if (Math.abs(d) < 5) return;
-  recordTrade(200 + Math.random()*800, d>0?'BUY':'SELL');
+  recordTrade(200 + Math.random() * 800, d > 0 ? 'BUY' : 'SELL');
 }
 
 function momentumCrowd() {
   const body = currentCandle.close - currentCandle.open;
   if (Math.abs(body) < 10) return;
-  recordTrade(500 + Math.random()*1500, body>0?'BUY':'SELL');
+  recordTrade(500 + Math.random() * 1500, body > 0 ? 'BUY' : 'SELL');
 }
 
-/* ===== ТИК РЫНКА ===== */
-function ensureCandle() {
-  const now = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
-  if (!lastCandleTime || now > lastCandleTime) {
-    if (currentCandle) updateCandle();
-    startNewCandle(now/1000);
-    lastCandleTime = now;
-  }
-}
-
+/* ===== РЫНОК ===== */
 function marketTick() {
   ensureCandle();
   randomCrowd();
