@@ -6,7 +6,6 @@
 
 <title>BTC/USD Simulator (5s)</title>
 
-<!-- НАДЁЖНЫЙ CDN -->
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
@@ -107,11 +106,6 @@ const chart = LightweightCharts.createChart(chartEl, {
 });
 
 const candleSeries = chart.addCandlestickSeries();
-const volumeSeries = chart.addHistogramSeries({
-  priceScaleId:'',
-  priceFormat:{ type:'volume' },
-  scaleMargins:{ top:0.8, bottom:0 }
-});
 
 setTimeout(() => {
   chart.applyOptions({ width: chartEl.clientWidth, height: 420 });
@@ -139,9 +133,7 @@ function startNewCandle(time) {
     open: price,
     high: price,
     low: price,
-    close: price,
-    buyUsd: 0,
-    sellUsd: 0
+    close: price
   };
 }
 
@@ -156,13 +148,6 @@ function ensureCandle() {
 function updateCandle() {
   if (!currentCandle) return;
   candleSeries.update(currentCandle);
-
-  const net = currentCandle.buyUsd - currentCandle.sellUsd;
-  volumeSeries.update({
-    time: currentCandle.time,
-    value: net,
-    color: net >= 0 ? '#1faa59' : '#d64545'
-  });
 }
 
 /* ===== СДЕЛКИ ===== */
@@ -175,14 +160,12 @@ function recordTrade(orderUsd, side) {
     balanceUSD -= orderUsd;
     balanceBTC += orderUsd / price;
     price += delta;
-    currentCandle.buyUsd += orderUsd;
   } else {
     const btcAmount = orderUsd / price;
     if (balanceBTC < btcAmount) return;
     balanceBTC -= btcAmount;
     balanceUSD += orderUsd;
     price -= delta;
-    currentCandle.sellUsd += orderUsd;
   }
 
   currentCandle.high = Math.max(currentCandle.high, price);
