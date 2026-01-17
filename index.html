@@ -73,9 +73,9 @@ button{
 <script>
 const TIMEFRAME = 10000;
 const LIQUIDITY = 1_000_000;
+const ABSORPTION = 0.35; // <— поглощение
 
 let price = 30000;
-let lastPrice = price;
 let balanceUSD = 100000;
 let balanceBTC = 0;
 
@@ -157,27 +157,32 @@ function updateCandle(){
   candleSeries.update(currentCandle);
 }
 
-/* TRADES */
-function recordTrade(usd,side){
-  const delta=usd/LIQUIDITY;
-  if(side==='BUY'){
-    if(balanceUSD<usd) return;
-    balanceUSD-=usd;
-    balanceBTC+=usd/price;
-    price+=delta;
-    currentNetVolume+=usd;
-  }else{
-    const btc=usd/price;
-    if(balanceBTC<btc) return;
-    balanceBTC-=btc;
-    balanceUSD+=usd;
-    price-=delta;
-    currentNetVolume-=usd;
+/* TRADES (АГРЕССОР) */
+function recordTrade(usd,aggressor){
+  const delta = usd / LIQUIDITY;
+
+  if(aggressor === 'BUY'){
+    if(balanceUSD < usd) return;
+    balanceUSD -= usd;
+    balanceBTC += usd / price;
+
+    price += delta * ABSORPTION;       // слабое давление
+    currentNetVolume += usd;           // дельта
   }
 
-  currentCandle.high=Math.max(currentCandle.high,price);
-  currentCandle.low=Math.min(currentCandle.low,price);
-  currentCandle.close=price;
+  if(aggressor === 'SELL'){
+    const btc = usd / price;
+    if(balanceBTC < btc) return;
+    balanceBTC -= btc;
+    balanceUSD += usd;
+
+    price -= delta * ABSORPTION;
+    currentNetVolume -= usd;
+  }
+
+  currentCandle.high = Math.max(currentCandle.high, price);
+  currentCandle.low  = Math.min(currentCandle.low, price);
+  currentCandle.close = price;
 
   volumeSeries.update({
     time: currentCandle.time + (2 * TIMEFRAME / 1000),
@@ -195,8 +200,11 @@ function trade(side){
 
 /* CROWD */
 function crowd(){
-  if(Math.random()<0.6) return;
-  recordTrade(50+Math.random()*500,'BUY');
+  if(Math.random()<0.6){
+    recordTrade(200+Math.random()*800,'SELL');
+  }else{
+    recordTrade(50+Math.random()*300,'BUY');
+  }
 }
 
 /* LOOP */
@@ -204,7 +212,6 @@ function tick(){
   ensureCandle();
   crowd();
   updateCandle();
-  lastPrice=price;
 }
 
 /* START */
