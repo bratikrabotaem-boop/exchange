@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Early Adopter Sim</title>
+<title>BTC Sim: Free Move</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     /* ===== СТИЛИ ===== */
@@ -15,8 +15,8 @@
     }
     .wrapper { max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
     
-    h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; }
-    .sub-title { text-align: center; font-size: 12px; color: #1fc77b; margin-bottom: 10px; }
+    h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; letter-spacing: 1px; }
+    .sub-title { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 10px; }
 
     /* БАЛАНС */
     .stats-bar {
@@ -44,7 +44,7 @@
         width: 100%; border: 1px solid #1f2937; background: #121417;
         position: relative; border-radius: 8px; overflow: hidden; margin-bottom: 10px;
     }
-    #price { width: 100%; height: 320px; }
+    #price { width: 100%; height: 320px; cursor: move; /* Курсор перемещения */ }
     #volume { width: 100%; height: 160px; }
 
     #controls {
@@ -71,8 +71,8 @@
 <body>
 
 <div class="wrapper">
-    <h3>BTC GENESIS</h3>
-    <div class="sub-title">CROWD BUYING ($500 - $1500 per tick)</div>
+    <h3>BTC SIMULATOR</h3>
+    <div class="sub-title">Small Buys ($100-$1000) | Pan Enabled</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -89,23 +89,25 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="10000" step="1000">
+        <input id="amount" type="number" value="5000" step="1000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
 
 <script>
-document.addEventListener('gesturestart', e => e.preventDefault());
+/* Разрешаем жесты, так как нам нужно двигать график */
+// document.addEventListener('gesturestart', e => e.preventDefault()); 
 
 /* ===== CONFIG ===== */
 const TIMEFRAME = 15000;
-// Уменьшили ликвидность, чтобы при цене $10 график рос быстрее
-const LIQUIDITY = 50_000; 
 
-// ИЗМЕНЕНИЯ:
-let price = 10; // Начинаем с $10 (почти с нуля)
-let balanceUSD = 1_000_000; // Твой миллион
-let balanceBTC = 1000; // Твоя 1000 BTC
+// Ликвидность 5000. При покупке на $100 цена сдвинется на 0.02.
+// При покупке на $1000 цена сдвинется на 0.2.
+const LIQUIDITY = 5_000; 
+
+let price = 10; 
+let balanceUSD = 1_000_000; 
+let balanceBTC = 1000; 
 
 let currentCandle = null;
 let lastCandleTime = null;
@@ -118,15 +120,29 @@ const commonOpts = {
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
     timeScale: { 
         timeVisible: true, secondsVisible: true, borderColor: '#1f2937',
-        barSpacing: 10, minBarSpacing: 2, rightOffset: 10
+        barSpacing: 12, minBarSpacing: 2, rightOffset: 10
     },
-    handleScroll: { vertTouchDrag: false, horzTouchDrag: true },
+    // ВАЖНО: Разрешаем перемещение (Drag)
+    handleScroll: { 
+        vertTouchDrag: true, // Можно двигать вверх-вниз пальцем
+        horzTouchDrag: true, 
+        pressedMouseMove: true // Можно двигать мышкой
+    },
+    kineticScroll: { // Плавная инерция при сдвиге
+        touch: true,
+        mouse: true
+    }
 };
 
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
-    rightPriceScale: { visible: true, borderColor: '#1f2937' },
+    rightPriceScale: { 
+        visible: true, 
+        borderColor: '#1f2937',
+        // AutoScale включен, но ручное перемещение его временно отключит
+        autoScale: true 
+    },
 });
 const candleSeries = priceChart.addCandlestickSeries({
     upColor: '#1fc77b', downColor: '#e04b4b', borderUpColor: '#1fc77b', borderDownColor: '#e04b4b', wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
@@ -165,7 +181,6 @@ const uiVolSell = document.getElementById('ui-vol-sell');
 function updateUI() {
     uiUsd.innerText = '$' + Math.floor(balanceUSD).toLocaleString('en-US');
     uiBtc.innerText = balanceBTC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-
     uiVolBuy.innerText = '$' + Math.floor(volBuy).toLocaleString('en-US');
     uiVolSell.innerText = '$' + Math.floor(volSell).toLocaleString('en-US');
 }
@@ -223,14 +238,14 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC === */
+/* === CROWD LOGIC (SMALL BUYS) === */
 function crowd(){
-    if(Math.random() < 0.1) return; // 90% времени идут торги
+    if(Math.random() < 0.1) return; 
 
-    // ИЗМЕНЕНИЕ: От 500 до 1500
-    const amt = 500 + Math.random() * 1000; 
+    // ИЗМЕНЕНИЕ: От 100 до 1000
+    const amt = 100 + Math.random() * 900; 
     
-    const side = 'BUY'; // Только покупки
+    const side = 'BUY'; 
     const deltaPrice = amt / LIQUIDITY;
 
     price += deltaPrice;
