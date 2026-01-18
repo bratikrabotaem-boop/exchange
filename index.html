@@ -3,84 +3,98 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Simulator: Price vs Delta</title>
+<title>BTC Simulator: 15s Scrollable</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     /* ===== СТИЛИ ===== */
     body {
-        margin: 0; background: #121417; color: #e6e6e6;
-        font-family: 'Roboto', sans-serif; height: 100vh;
-        display: flex; flex-direction: column; overflow: hidden;
+        margin: 0; 
+        background: #121417; 
+        color: #e6e6e6;
+        font-family: -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+        /* ВЕРНУЛИ СКРОЛЛ */
+        overflow-y: auto; 
+        min-height: 100vh;
+        padding-bottom: 40px;
+        -webkit-tap-highlight-color: transparent;
     }
+
     .wrapper {
-        width: 100%; max-width: 800px; margin: 0 auto;
-        padding: 10px; display: flex; flex-direction: column; flex: 1;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 10px;
         box-sizing: border-box;
     }
-    h3 { margin: 5px 0; text-align: center; color: #fff; font-weight: 800; }
-    .sub-title { text-align: center; font-size: 11px; color: #6b7280; margin-bottom: 8px; }
+
+    h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; }
+    .sub-title { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 15px; }
 
     /* HUD */
     .stats-bar {
         display: flex; justify-content: space-between;
-        background: #1e2228; padding: 8px 12px; border-radius: 8px;
-        margin-bottom: 5px; border: 1px solid #1f2937; font-family: monospace;
+        background: #1e2228; padding: 10px 15px; border-radius: 8px;
+        margin-bottom: 15px; border: 1px solid #1f2937; font-family: monospace; font-size: 14px;
     }
     .stat-val { font-weight: 700; color: #fff; }
     .stat-val.usd { color: #1fc77b; }
 
-    /* CHART CONTAINER */
-    .chart-container {
-        flex: 1; display: flex; flex-direction: column; gap: 5px; min-height: 0;
-    }
+    /* ГРАФИКИ (Фиксированная высота для скролла) */
     .chart-box {
-        width: 100%; border: 1px solid #1f2937; background: #121417;
-        position: relative; border-radius: 6px; overflow: hidden;
+        width: 100%; 
+        border: 1px solid #1f2937; 
+        background: #121417;
+        position: relative; 
+        border-radius: 8px; 
+        overflow: hidden;
+        margin-bottom: 10px;
     }
-    /* Цена занимает 70%, Дельта Объем 30% */
-    .box-price { flex: 7; }
-    .box-volume { flex: 3; min-height: 80px; }
 
-    #price, #volume { width: 100%; height: 100%; }
+    /* Явные высоты для блоков */
+    #price { width: 100%; height: 320px; }
+    #volume { width: 100%; height: 160px; } /* Чуть выше для дельты */
 
     /* CONTROLS */
     #controls {
-        display: flex; gap: 10px; margin-top: 10px;
-        background: #1e2228; padding: 10px; border-radius: 12px;
-        border: 1px solid #1f2937; margin-bottom: safe-area-inset-bottom;
+        display: flex; gap: 12px; margin-top: 20px;
+        background: #1e2228; padding: 15px; border-radius: 12px;
+        border: 1px solid #1f2937; 
     }
     #amount {
-        width: 80px; padding: 12px; font-size: 16px; text-align: center;
+        width: 90px; padding: 12px; font-size: 16px; text-align: center;
         background: #121417; border: 1px solid #374151; color: #fff;
         border-radius: 8px; font-weight: 700; outline: none;
     }
     button {
         flex: 1; padding: 12px; font-size: 16px; font-weight: 800;
         border: none; border-radius: 8px; cursor: pointer; color: #fff;
+        transition: transform 0.1s;
     }
-    button:active { transform: scale(0.97); }
-    .buy { background: #1fc77b; color: #052e16; }
-    .sell { background: #e04b4b; color: #3f0808; }
+    button:active { transform: scale(0.96); }
+    .buy { background: #1fc77b; color: #052e16; box-shadow: 0 4px 0 #158f58; }
+    .buy:active { box-shadow: 0 0 0 #158f58; transform: translateY(4px); }
+    
+    .sell { background: #e04b4b; color: #3f0808; box-shadow: 0 4px 0 #9e3333; }
+    .sell:active { box-shadow: 0 0 0 #9e3333; transform: translateY(4px); }
+
 </style>
 </head>
 <body>
 
 <div class="wrapper">
     <h3>MARKET SIMULATOR</h3>
-    <div class="sub-title">Delta Volume: Green = Buyers Win, Red = Sellers Win</div>
+    <div class="sub-title">15s Timeframe | Delta Volume</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">100,000</span></div>
         <div>BTC: <span class="stat-val" id="ui-btc">0.00</span></div>
     </div>
 
-    <div class="chart-container">
-        <div class="chart-box box-price">
-            <div id="price"></div>
-        </div>
-        <div class="chart-box box-volume">
-            <div id="volume"></div>
-        </div>
+    <div class="chart-box">
+        <div id="price"></div>
+    </div>
+    
+    <div class="chart-box">
+        <div id="volume"></div>
     </div>
 
     <div id="controls">
@@ -91,11 +105,12 @@
 </div>
 
 <script>
+/* Блокируем зум всей страницы, но не графиков */
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 /* ===== CONFIG ===== */
-const TIMEFRAME = 3000; // 3 сек
-const LIQUIDITY = 1_500_000; // Ликвидность рынка
+const TIMEFRAME = 15000; // 15 секунд
+const LIQUIDITY = 1_500_000; 
 
 let price = 30000;
 let balanceUSD = 100000;
@@ -113,14 +128,20 @@ const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
     timeScale: { 
-        timeVisible: true, secondsVisible: true, borderColor: '#1f2937',
-        barSpacing: 15, minBarSpacing: 2, rightOffset: 5
+        timeVisible: true, 
+        secondsVisible: true, 
+        borderColor: '#1f2937',
+        barSpacing: 10,  // Чуть плотнее, так как свеча длится дольше
+        minBarSpacing: 2, 
+        rightOffset: 10
     },
-    crosshair: { mode: 1 }, // Free mode
+    // Разрешаем прокрутку страницы пальцем, если не зумим график
+    handleScroll: { vertTouchDrag: false, horzTouchDrag: true },
 };
 
 // PRICE
-const priceChart = LightweightCharts.createChart(document.getElementById('price'), {
+const priceEl = document.getElementById('price');
+const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
     rightPriceScale: { visible: true, borderColor: '#1f2937' },
 });
@@ -131,37 +152,34 @@ const candleSeries = priceChart.addCandlestickSeries({
 });
 
 // DELTA VOLUME
-const volumeChart = LightweightCharts.createChart(document.getElementById('volume'), {
+const volumeEl = document.getElementById('volume');
+const volumeChart = LightweightCharts.createChart(volumeEl, {
     ...commonOpts,
     rightPriceScale: { visible: true, borderColor: '#1f2937' }, 
 });
 
-// Используем HistogramSeries для Delta Volume
 const volumeSeries = volumeChart.addHistogramSeries({
     priceFormat: { type: 'volume' },
     priceScaleId: 'right',
-    // 0 линия будет посередине автоматически при наличии + и - значений
 });
 
 /* SYNC */
 function sync(a, b) {
     const s1 = a.timeScale(), s2 = b.timeScale();
-    s1.subscribeVisibleLogicalRangeChange(r => s2.setVisibleLogicalRange(r));
-    s2.subscribeVisibleLogicalRangeChange(r => s1.setVisibleLogicalRange(r));
+    s1.subscribeVisibleLogicalRangeChange(r => { if(r) s2.setVisibleLogicalRange(r) });
+    s2.subscribeVisibleLogicalRangeChange(r => { if(r) s1.setVisibleLogicalRange(r) });
 }
 sync(priceChart, volumeChart);
 
-/* RESIZE */
+/* RESIZE (Для скролл-режима меняем только ширину) */
 function resize() {
-    const p = document.getElementById('price').parentElement;
-    const v = document.getElementById('volume').parentElement;
-    if(p && v) {
-        priceChart.resize(p.offsetWidth, p.offsetHeight);
-        volumeChart.resize(v.offsetWidth, v.offsetHeight);
+    if(priceEl.parentElement) {
+        const w = priceEl.parentElement.offsetWidth;
+        priceChart.resize(w, 320); // Высота зафиксирована в JS
+        volumeChart.resize(w, 160); 
     }
 }
 window.addEventListener('resize', resize);
-setTimeout(resize, 100);
 
 /* UI */
 const uiUsd = document.getElementById('ui-usd');
@@ -174,10 +192,8 @@ function updateUI() {
 /* ===== LOGIC ===== */
 
 function startNewCandle(time){
-    // Сброс объемов для новой свечи
     volBuy = 0;
     volSell = 0;
-    
     currentCandle = {time, open:price, high:price, low:price, close:price};
     candleSeries.update(currentCandle);
     updateVolume(time);
@@ -186,10 +202,9 @@ function startNewCandle(time){
 function updateVolume(time) {
     // FORMULA: DELTA = BUY - SELL
     const delta = volBuy - volSell;
-    
     volumeSeries.update({
         time: time,
-        value: delta, // Если +, растет вверх. Если -, растет вниз.
+        value: delta, 
         color: delta >= 0 ? '#1fc77b' : '#e04b4b'
     });
 }
@@ -209,31 +224,22 @@ function recordTrade(usd, side){
         if(balanceUSD < usd) return;
         balanceUSD -= usd;
         balanceBTC += usd/price;
-        
-        // Цена растет, но с рандомом (иногда лимитные продавцы давят)
         price += deltaPrice * (0.8 + Math.random() * 0.4);
-        
-        // Учет объема
         volBuy += usd;
     } else {
         const btcNeeded = usd/price;
         if(balanceBTC < btcNeeded) return;
         balanceBTC -= btcNeeded;
         balanceUSD += usd;
-        
         price -= deltaPrice * (0.8 + Math.random() * 0.4);
-        
-        // Учет объема
         volSell += usd;
     }
 
-    // Обновляем свечу
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
     currentCandle.close = price;
     candleSeries.update(currentCandle);
     
-    // Обновляем объем
     updateVolume(currentCandle.time);
     updateUI();
 }
@@ -245,10 +251,8 @@ function trade(side){
 }
 
 function crowd(){
-    // Боты торгуют мелочью, чтобы создать фон
     if(Math.random() < 0.2) return;
-    
-    const amt = 100 + Math.random() * 1500; // Мелочь по сравнению с твоими 10к
+    const amt = 100 + Math.random() * 1500;
     const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
     const deltaPrice = amt / LIQUIDITY;
 
@@ -273,6 +277,7 @@ const start = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
 startNewCandle(start/1000);
 lastCandleTime = start;
 updateUI();
+resize();
 
 setInterval(() => {
     ensureCandle();
