@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Sim: Weak Crowd</title>
+<title>BTC Sim: Fixed Sync</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     body {
@@ -70,7 +70,7 @@
 
 <div class="wrapper">
     <h3>WHALE SIMULATOR</h3>
-    <div class="sub-title">You are the Whale. Crowd is weak.</div>
+    <div class="sub-title">Mechanic: Huge Buy Wall Absorbs Sells</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -87,14 +87,17 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="50000" step="10000">
+        <input id="amount" type="number" value="10000" step="1000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
 
 <script>
 const TIMEFRAME = 15000;
-const LIQUIDITY = 5_000; // Низкая ликвидность, чтобы цена летала от твоих ордеров
+
+/* ===== МЕХАНИКА ===== */
+const BUY_LIQUIDITY = 2_000; 
+const SELL_LIQUIDITY = 40_000; 
 
 let price = 10; 
 let balanceUSD = 1_000_000; 
@@ -105,7 +108,7 @@ let lastCandleTime = null;
 let volBuy = 0;
 let volSell = 0;
 
-/* CHARTS SETUP */
+/* ===== НАСТРОЙКИ ГРАФИКОВ ===== */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
@@ -117,24 +120,38 @@ const commonOpts = {
     kineticScroll: { touch: true, mouse: true }
 };
 
+/* ===== PRICE CHART ===== */
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
-    rightPriceScale: { visible: true, borderColor: '#1f2937', autoScale: true },
+    rightPriceScale: { 
+        visible: true, 
+        borderColor: '#1f2937', 
+        autoScale: true,
+        // ВАЖНО: Фиксируем ширину шкалы, чтобы графики не разъезжались
+        minimumWidth: 75, 
+    },
 });
 const candleSeries = priceChart.addCandlestickSeries({
     upColor: '#1fc77b', downColor: '#e04b4b', borderUpColor: '#1fc77b', borderDownColor: '#e04b4b', wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
 });
 
+/* ===== VOLUME CHART ===== */
 const volumeEl = document.getElementById('volume');
 const volumeChart = LightweightCharts.createChart(volumeEl, {
     ...commonOpts,
-    rightPriceScale: { visible: true, borderColor: '#1f2937' }, 
+    rightPriceScale: { 
+        visible: true, 
+        borderColor: '#1f2937',
+        // ВАЖНО: Такая же ширина шкалы, как у цены
+        minimumWidth: 75,
+    }, 
 });
 const volumeSeries = volumeChart.addHistogramSeries({
     priceFormat: { type: 'volume' }, priceScaleId: 'right',
 });
 
+/* ===== СИНХРОНИЗАЦИЯ ===== */
 function sync(a, b) {
     const s1 = a.timeScale(), s2 = b.timeScale();
     s1.subscribeVisibleLogicalRangeChange(r => { if(r) s2.setVisibleLogicalRange(r) });
@@ -150,7 +167,7 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-/* UI & LOGIC */
+/* ===== UI & LOGIC ===== */
 const uiUsd = document.getElementById('ui-usd');
 const uiBtc = document.getElementById('ui-btc');
 const uiVolBuy = document.getElementById('ui-vol-buy');
@@ -188,19 +205,30 @@ function ensureCandle(){
 }
 
 function recordTrade(usd, side){
-    const deltaPrice = usd / LIQUIDITY;
+    let deltaPrice = 0;
+
     if(side === 'BUY'){
         if(balanceUSD < usd) return;
-        balanceUSD -= usd; balanceBTC += usd/price;
-        price += deltaPrice;
+        balanceUSD -= usd; 
+        balanceBTC += usd/price;
         volBuy += usd;
+        
+        // Покупки сильно двигают цену (легкий рынок)
+        deltaPrice = usd / BUY_LIQUIDITY;
+        price += deltaPrice;
+        
     } else {
         const btcNeeded = usd/price;
         if(balanceBTC < btcNeeded) return;
-        balanceBTC -= btcNeeded; balanceUSD += usd;
-        price -= deltaPrice;
+        balanceBTC -= btcNeeded; 
+        balanceUSD += usd;
         volSell += usd;
+
+        // Продажи почти НЕ двигают цену (Стена покупателя)
+        deltaPrice = usd / SELL_LIQUIDITY;
+        price -= deltaPrice;
     }
+
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
     currentCandle.close = price;
@@ -215,17 +243,15 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC (WEAK) === */
+/* === CROWD LOGIC === */
 function crowd(){
     if(Math.random() < 0.1) return; 
 
-    // ОСЛАБИЛИ ТОЛПУ: $50 - $300 за тик.
-    // За 15 сек (75 тиков) они купят максимум на ~$15,000.
-    // Если ты продашь $50,000, ты точно перебьешь их (50k > 15k).
-    const amt = 50 + Math.random() * 250; 
-    
+    const amt = 100 + Math.random() * 500; 
     const side = 'BUY'; 
-    const deltaPrice = amt / LIQUIDITY;
+    
+    // Толпа покупает с высокой эффективностью (маленькая ликвидность на продажу)
+    const deltaPrice = amt / BUY_LIQUIDITY;
 
     price += deltaPrice;
     volBuy += amt;
