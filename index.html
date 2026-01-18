@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Sim: Free Move</title>
+<title>BTC Sim: Weak Crowd</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-    /* ===== СТИЛИ ===== */
     body {
         margin: 0; background: #121417; color: #e6e6e6;
         font-family: -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
@@ -14,11 +13,10 @@
         -webkit-tap-highlight-color: transparent;
     }
     .wrapper { max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
-    
     h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; letter-spacing: 1px; }
     .sub-title { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 10px; }
 
-    /* БАЛАНС */
+    /* HUD */
     .stats-bar {
         display: flex; justify-content: space-between;
         background: #1e2228; padding: 10px 15px; border-radius: 8px 8px 0 0;
@@ -28,7 +26,7 @@
     .stat-val { font-weight: 700; color: #fff; }
     .stat-val.usd { color: #1fc77b; }
 
-    /* ПОТОК */
+    /* FLOW */
     .market-flow {
         display: flex; justify-content: space-between;
         background: #16191d; padding: 8px 15px; border-radius: 0 0 8px 8px;
@@ -44,7 +42,7 @@
         width: 100%; border: 1px solid #1f2937; background: #121417;
         position: relative; border-radius: 8px; overflow: hidden; margin-bottom: 10px;
     }
-    #price { width: 100%; height: 320px; cursor: move; /* Курсор перемещения */ }
+    #price { width: 100%; height: 320px; cursor: move; }
     #volume { width: 100%; height: 160px; }
 
     #controls {
@@ -71,8 +69,8 @@
 <body>
 
 <div class="wrapper">
-    <h3>BTC SIMULATOR</h3>
-    <div class="sub-title">Small Buys ($100-$1000) | Pan Enabled</div>
+    <h3>WHALE SIMULATOR</h3>
+    <div class="sub-title">You are the Whale. Crowd is weak.</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -80,8 +78,8 @@
     </div>
 
     <div class="market-flow">
-        <div class="flow-item">Candle Buys: <span class="flow-val buy" id="ui-vol-buy">$0</span></div>
-        <div class="flow-item">Candle Sells: <span class="flow-val sell" id="ui-vol-sell">$0</span></div>
+        <div class="flow-item">Buys: <span class="flow-val buy" id="ui-vol-buy">$0</span></div>
+        <div class="flow-item">Sells: <span class="flow-val sell" id="ui-vol-sell">$0</span></div>
     </div>
 
     <div class="chart-box"><div id="price"></div></div>
@@ -89,21 +87,14 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="5000" step="1000">
+        <input id="amount" type="number" value="50000" step="10000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
 
 <script>
-/* Разрешаем жесты, так как нам нужно двигать график */
-// document.addEventListener('gesturestart', e => e.preventDefault()); 
-
-/* ===== CONFIG ===== */
 const TIMEFRAME = 15000;
-
-// Ликвидность 5000. При покупке на $100 цена сдвинется на 0.02.
-// При покупке на $1000 цена сдвинется на 0.2.
-const LIQUIDITY = 5_000; 
+const LIQUIDITY = 5_000; // Низкая ликвидность, чтобы цена летала от твоих ордеров
 
 let price = 10; 
 let balanceUSD = 1_000_000; 
@@ -114,7 +105,7 @@ let lastCandleTime = null;
 let volBuy = 0;
 let volSell = 0;
 
-/* ===== CHARTS ===== */
+/* CHARTS SETUP */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
@@ -122,27 +113,14 @@ const commonOpts = {
         timeVisible: true, secondsVisible: true, borderColor: '#1f2937',
         barSpacing: 12, minBarSpacing: 2, rightOffset: 10
     },
-    // ВАЖНО: Разрешаем перемещение (Drag)
-    handleScroll: { 
-        vertTouchDrag: true, // Можно двигать вверх-вниз пальцем
-        horzTouchDrag: true, 
-        pressedMouseMove: true // Можно двигать мышкой
-    },
-    kineticScroll: { // Плавная инерция при сдвиге
-        touch: true,
-        mouse: true
-    }
+    handleScroll: { vertTouchDrag: true, horzTouchDrag: true, pressedMouseMove: true },
+    kineticScroll: { touch: true, mouse: true }
 };
 
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
-    rightPriceScale: { 
-        visible: true, 
-        borderColor: '#1f2937',
-        // AutoScale включен, но ручное перемещение его временно отключит
-        autoScale: true 
-    },
+    rightPriceScale: { visible: true, borderColor: '#1f2937', autoScale: true },
 });
 const candleSeries = priceChart.addCandlestickSeries({
     upColor: '#1fc77b', downColor: '#e04b4b', borderUpColor: '#1fc77b', borderDownColor: '#e04b4b', wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
@@ -172,7 +150,7 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-/* ===== UI ===== */
+/* UI & LOGIC */
 const uiUsd = document.getElementById('ui-usd');
 const uiBtc = document.getElementById('ui-btc');
 const uiVolBuy = document.getElementById('ui-vol-buy');
@@ -185,7 +163,6 @@ function updateUI() {
     uiVolSell.innerText = '$' + Math.floor(volSell).toLocaleString('en-US');
 }
 
-/* ===== LOGIC ===== */
 function startNewCandle(time){
     volBuy = 0; volSell = 0;
     currentCandle = {time, open:price, high:price, low:price, close:price};
@@ -238,12 +215,14 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC (SMALL BUYS) === */
+/* === CROWD LOGIC (WEAK) === */
 function crowd(){
     if(Math.random() < 0.1) return; 
 
-    // ИЗМЕНЕНИЕ: От 100 до 1000
-    const amt = 100 + Math.random() * 900; 
+    // ОСЛАБИЛИ ТОЛПУ: $50 - $300 за тик.
+    // За 15 сек (75 тиков) они купят максимум на ~$15,000.
+    // Если ты продашь $50,000, ты точно перебьешь их (50k > 15k).
+    const amt = 50 + Math.random() * 250; 
     
     const side = 'BUY'; 
     const deltaPrice = amt / LIQUIDITY;
@@ -260,7 +239,6 @@ function crowd(){
     updateUI();
 }
 
-/* INIT */
 const start = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
 startNewCandle(start/1000);
 lastCandleTime = start;
