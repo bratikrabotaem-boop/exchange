@@ -3,33 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Simulator: 15s Scrollable</title>
+<title>BTC Simulator: Crowd PUMP Only</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     /* ===== СТИЛИ ===== */
     body {
-        margin: 0; 
-        background: #121417; 
-        color: #e6e6e6;
+        margin: 0; background: #121417; color: #e6e6e6;
         font-family: -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
-        /* ВЕРНУЛИ СКРОЛЛ */
-        overflow-y: auto; 
-        min-height: 100vh;
-        padding-bottom: 40px;
+        overflow-y: auto; min-height: 100vh; padding-bottom: 40px;
         -webkit-tap-highlight-color: transparent;
     }
-
-    .wrapper {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 10px;
-        box-sizing: border-box;
-    }
-
+    .wrapper { max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
     h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; }
-    .sub-title { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 15px; }
+    .sub-title { text-align: center; font-size: 12px; color: #1fc77b; margin-bottom: 15px; } /* Зеленый подзаголовок */
 
-    /* HUD */
     .stats-bar {
         display: flex; justify-content: space-between;
         background: #1e2228; padding: 10px 15px; border-radius: 8px;
@@ -38,26 +25,16 @@
     .stat-val { font-weight: 700; color: #fff; }
     .stat-val.usd { color: #1fc77b; }
 
-    /* ГРАФИКИ (Фиксированная высота для скролла) */
     .chart-box {
-        width: 100%; 
-        border: 1px solid #1f2937; 
-        background: #121417;
-        position: relative; 
-        border-radius: 8px; 
-        overflow: hidden;
-        margin-bottom: 10px;
+        width: 100%; border: 1px solid #1f2937; background: #121417;
+        position: relative; border-radius: 8px; overflow: hidden; margin-bottom: 10px;
     }
-
-    /* Явные высоты для блоков */
     #price { width: 100%; height: 320px; }
-    #volume { width: 100%; height: 160px; } /* Чуть выше для дельты */
+    #volume { width: 100%; height: 160px; }
 
-    /* CONTROLS */
     #controls {
         display: flex; gap: 12px; margin-top: 20px;
-        background: #1e2228; padding: 15px; border-radius: 12px;
-        border: 1px solid #1f2937; 
+        background: #1e2228; padding: 15px; border-radius: 12px; border: 1px solid #1f2937; 
     }
     #amount {
         width: 90px; padding: 12px; font-size: 16px; text-align: center;
@@ -72,30 +49,23 @@
     button:active { transform: scale(0.96); }
     .buy { background: #1fc77b; color: #052e16; box-shadow: 0 4px 0 #158f58; }
     .buy:active { box-shadow: 0 0 0 #158f58; transform: translateY(4px); }
-    
     .sell { background: #e04b4b; color: #3f0808; box-shadow: 0 4px 0 #9e3333; }
     .sell:active { box-shadow: 0 0 0 #9e3333; transform: translateY(4px); }
-
 </style>
 </head>
 <body>
 
 <div class="wrapper">
     <h3>MARKET SIMULATOR</h3>
-    <div class="sub-title">15s Timeframe | Delta Volume</div>
+    <div class="sub-title">MODE: CROWD ONLY BUYS (UP ONLY)</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">100,000</span></div>
         <div>BTC: <span class="stat-val" id="ui-btc">0.00</span></div>
     </div>
 
-    <div class="chart-box">
-        <div id="price"></div>
-    </div>
-    
-    <div class="chart-box">
-        <div id="volume"></div>
-    </div>
+    <div class="chart-box"><div id="price"></div></div>
+    <div class="chart-box"><div id="volume"></div></div>
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
@@ -105,11 +75,10 @@
 </div>
 
 <script>
-/* Блокируем зум всей страницы, но не графиков */
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 /* ===== CONFIG ===== */
-const TIMEFRAME = 15000; // 15 секунд
+const TIMEFRAME = 15000;
 const LIQUIDITY = 1_500_000; 
 
 let price = 30000;
@@ -119,7 +88,6 @@ let balanceBTC = 0;
 let currentCandle = null;
 let lastCandleTime = null;
 
-// Счетчики объемов
 let volBuy = 0;
 let volSell = 0;
 
@@ -128,42 +96,30 @@ const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
     timeScale: { 
-        timeVisible: true, 
-        secondsVisible: true, 
-        borderColor: '#1f2937',
-        barSpacing: 10,  // Чуть плотнее, так как свеча длится дольше
-        minBarSpacing: 2, 
-        rightOffset: 10
+        timeVisible: true, secondsVisible: true, borderColor: '#1f2937',
+        barSpacing: 10, minBarSpacing: 2, rightOffset: 10
     },
-    // Разрешаем прокрутку страницы пальцем, если не зумим график
     handleScroll: { vertTouchDrag: false, horzTouchDrag: true },
 };
 
-// PRICE
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
     rightPriceScale: { visible: true, borderColor: '#1f2937' },
 });
 const candleSeries = priceChart.addCandlestickSeries({
-    upColor: '#1fc77b', downColor: '#e04b4b',
-    borderUpColor: '#1fc77b', borderDownColor: '#e04b4b',
-    wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
+    upColor: '#1fc77b', downColor: '#e04b4b', borderUpColor: '#1fc77b', borderDownColor: '#e04b4b', wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
 });
 
-// DELTA VOLUME
 const volumeEl = document.getElementById('volume');
 const volumeChart = LightweightCharts.createChart(volumeEl, {
     ...commonOpts,
     rightPriceScale: { visible: true, borderColor: '#1f2937' }, 
 });
-
 const volumeSeries = volumeChart.addHistogramSeries({
-    priceFormat: { type: 'volume' },
-    priceScaleId: 'right',
+    priceFormat: { type: 'volume' }, priceScaleId: 'right',
 });
 
-/* SYNC */
 function sync(a, b) {
     const s1 = a.timeScale(), s2 = b.timeScale();
     s1.subscribeVisibleLogicalRangeChange(r => { if(r) s2.setVisibleLogicalRange(r) });
@@ -171,17 +127,14 @@ function sync(a, b) {
 }
 sync(priceChart, volumeChart);
 
-/* RESIZE (Для скролл-режима меняем только ширину) */
 function resize() {
     if(priceEl.parentElement) {
         const w = priceEl.parentElement.offsetWidth;
-        priceChart.resize(w, 320); // Высота зафиксирована в JS
-        volumeChart.resize(w, 160); 
+        priceChart.resize(w, 320); volumeChart.resize(w, 160); 
     }
 }
 window.addEventListener('resize', resize);
 
-/* UI */
 const uiUsd = document.getElementById('ui-usd');
 const uiBtc = document.getElementById('ui-btc');
 function updateUI() {
@@ -190,21 +143,17 @@ function updateUI() {
 }
 
 /* ===== LOGIC ===== */
-
 function startNewCandle(time){
-    volBuy = 0;
-    volSell = 0;
+    volBuy = 0; volSell = 0;
     currentCandle = {time, open:price, high:price, low:price, close:price};
     candleSeries.update(currentCandle);
     updateVolume(time);
 }
 
 function updateVolume(time) {
-    // FORMULA: DELTA = BUY - SELL
     const delta = volBuy - volSell;
     volumeSeries.update({
-        time: time,
-        value: delta, 
+        time: time, value: delta, 
         color: delta >= 0 ? '#1fc77b' : '#e04b4b'
     });
 }
@@ -219,27 +168,22 @@ function ensureCandle(){
 
 function recordTrade(usd, side){
     const deltaPrice = usd / LIQUIDITY;
-
     if(side === 'BUY'){
         if(balanceUSD < usd) return;
-        balanceUSD -= usd;
-        balanceBTC += usd/price;
+        balanceUSD -= usd; balanceBTC += usd/price;
         price += deltaPrice * (0.8 + Math.random() * 0.4);
         volBuy += usd;
     } else {
         const btcNeeded = usd/price;
         if(balanceBTC < btcNeeded) return;
-        balanceBTC -= btcNeeded;
-        balanceUSD += usd;
+        balanceBTC -= btcNeeded; balanceUSD += usd;
         price -= deltaPrice * (0.8 + Math.random() * 0.4);
         volSell += usd;
     }
-
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
     currentCandle.close = price;
     candleSeries.update(currentCandle);
-    
     updateVolume(currentCandle.time);
     updateUI();
 }
@@ -250,19 +194,19 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
+/* === CROWD LOGIC (ONLY BUYS) === */
 function crowd(){
     if(Math.random() < 0.2) return;
+    
     const amt = 100 + Math.random() * 1500;
-    const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
+    
+    // ИЗМЕНЕНИЕ: Всегда BUY
+    const side = 'BUY'; 
     const deltaPrice = amt / LIQUIDITY;
 
-    if(side === 'BUY'){
-        price += deltaPrice;
-        volBuy += amt;
-    } else {
-        price -= deltaPrice;
-        volSell += amt;
-    }
+    // Так как side всегда BUY, упрощаем логику
+    price += deltaPrice;
+    volBuy += amt;
 
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
@@ -283,7 +227,6 @@ setInterval(() => {
     ensureCandle();
     crowd();
 }, 200);
-
 </script>
 </body>
 </html>
