@@ -2,75 +2,144 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
 <title>BTC/USD Simulator + Net Volume</title>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <style>
-body{
-  margin:0;
-  background:#111;
-  color:#ddd;
-  font-family:Arial,sans-serif;
-  text-align:center;
+/* ===== СТИЛЬ (Theme) ===== */
+body {
+    margin: 0;
+    background: #121417;
+    color: #e6e6e6;
+    font-family: -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    overflow-y: auto; /* Скролл страницы разрешен */
+    min-height: 100vh;
+    padding-bottom: 40px;
+    -webkit-tap-highlight-color: transparent;
 }
 
-h3{margin:12px 0}
-
-#price{
-  width:100%;
-  height:320px;
+.wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
-#volume{
-  width:100%;
-  height:100px;
+h3 {
+    margin: 15px 0 5px 0;
+    text-align: center;
+    color: #fff;
+    font-weight: 800;
+}
+.sub-title {
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 20px;
 }
 
-#controls{
-  display:flex;
-  justify-content:center;
-  gap:14px;
-  margin:12px 0;
+/* ===== ГРАФИКИ (Рамки и скругления) ===== */
+.chart-box {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #1f2937;
+    position: relative;
+    margin-bottom: 10px;
+    background: #121417;
 }
 
-#amount{
-  width:120px;
-  padding:10px;
-  font-size:18px;
-  text-align:center;
+#price { 
+    width: 100%; 
+    height: 320px; 
+}
+#volume { 
+    width: 100%; 
+    height: 100px; 
 }
 
-button{
-  padding:12px 22px;
-  font-size:20px;
-  font-weight:bold;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
+/* ===== УПРАВЛЕНИЕ (Controls) ===== */
+#controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    margin-top: 20px;
+    background: #1e2228;
+    padding: 15px;
+    border-radius: 16px;
+    border: 1px solid #1f2937;
 }
 
-.buy{background:#1faa59;color:#fff}
-.sell{background:#d64545;color:#fff}
+#amount {
+    width: 100px;
+    padding: 12px;
+    font-size: 18px;
+    text-align: center;
+    background: #121417;
+    border: 1px solid #374151;
+    color: #fff;
+    border-radius: 8px;
+    outline: none;
+    font-weight: 700;
+}
+
+button {
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 800;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.1s;
+    color: #fff;
+}
+button:active { transform: scale(0.96); }
+
+/* Цвета кнопок под стиль графиков */
+.buy { 
+    background: #1fc77b; 
+    color: #000; 
+    box-shadow: 0 4px 12px rgba(31, 199, 123, 0.2); 
+}
+.sell { 
+    background: #e04b4b; 
+    color: #fff; 
+    box-shadow: 0 4px 12px rgba(224, 75, 75, 0.2); 
+}
+
 </style>
 </head>
 
 <body>
 
-<h3>BTC/USD Simulator</h3>
+<div class="wrapper">
+    <h3>BTC/USD SIMULATOR</h3>
+    <div class="sub-title">Interactive Market Logic</div>
 
-<div id="price"></div>
-<div id="volume"></div>
+    <div class="chart-box">
+        <div id="price"></div>
+    </div>
+    
+    <div class="chart-box">
+        <div id="volume"></div>
+    </div>
 
-<div id="controls">
-  <button class="buy" onclick="trade('BUY')">BUY</button>
-  <input id="amount" type="number" value="1000">
-  <button class="sell" onclick="trade('SELL')">SELL</button>
+    <div id="controls">
+        <button class="buy" onclick="trade('BUY')">BUY</button>
+        <input id="amount" type="number" value="1000">
+        <button class="sell" onclick="trade('SELL')">SELL</button>
+    </div>
 </div>
 
 <script>
+/* ===== iOS ZOOM BLOCK ===== */
+document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+
+/* ===== CONFIG & CONSTANTS ===== */
 const TIMEFRAME = 10000;
 const LIQUIDITY = 1_000_000;
 
@@ -83,63 +152,81 @@ let currentCandle = null;
 let lastCandleTime = null;
 let currentNetVolume = 0;
 
+/* ===== CHART CONFIGURATION (Style from Code 1) ===== */
+const commonOpts = {
+    layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
+    grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+    timeScale: { 
+        timeVisible: true, 
+        secondsVisible: false, 
+        borderColor: '#1f2937' 
+    },
+    // ВАЖНО: Настройки скролла и зума
+    handleScroll: { 
+        vertTouchDrag: false, // Разрешает вертикальный скролл страницы
+        horzTouchDrag: true 
+    },
+    handleScale: { 
+        pinch: true, // Разрешает зум пальцами
+        axisPressedMouseMove: true 
+    }
+};
+
 /* PRICE CHART */
 const priceEl = document.getElementById('price');
-const priceChart = LightweightCharts.createChart(priceEl,{
-  layout:{background:{color:'#111'},textColor:'#ccc'},
-  grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-  rightPriceScale:{visible:false},
-  timeScale:{timeVisible:true,secondsVisible:false}
+const priceChart = LightweightCharts.createChart(priceEl, {
+    ...commonOpts,
+    rightPriceScale: { visible: false },
 });
 
 const candleSeries = priceChart.addCandlestickSeries({
-  upColor:'#1faa59',
-  downColor:'#d64545',
-  borderUpColor:'#1faa59',
-  borderDownColor:'#d64545',
-  wickUpColor:'#1faa59',
-  wickDownColor:'#d64545'
+    upColor: '#1fc77b', downColor: '#e04b4b',
+    borderUpColor: '#1fc77b', borderDownColor: '#e04b4b',
+    wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
 });
 
 /* VOLUME CHART */
 const volumeEl = document.getElementById('volume');
-const volumeChart = LightweightCharts.createChart(volumeEl,{
-  layout:{background:{color:'#111'},textColor:'#ccc'},
-  grid:{vertLines:{color:'#222'},horzLines:{color:'#222'}},
-  rightPriceScale:{visible:false},
-  leftPriceScale:{visible:false},
-  timeScale:{timeVisible:true,secondsVisible:false}
+const volumeChart = LightweightCharts.createChart(volumeEl, {
+    ...commonOpts,
+    rightPriceScale: { visible: false },
+    leftPriceScale: { visible: false },
 });
 
 const volumeSeries = volumeChart.addHistogramSeries({
-  base:0,
-  priceFormat:{
-    type:'custom',
-    formatter:v => v.toFixed(2) + 'M'
-  }
+    base: 0,
+    priceFormat: {
+        type: 'custom',
+        formatter: v => v.toFixed(2) + 'M'
+    }
 });
 
 /* SYNC */
-let syncing=false;
-function sync(a,b){
-  a.timeScale().subscribeVisibleLogicalRangeChange(r=>{
-    if(syncing||!r) return;
-    syncing=true;
-    b.timeScale().setVisibleLogicalRange(r);
-    syncing=false;
-  });
+let syncing = false;
+function sync(a, b) {
+    a.timeScale().subscribeVisibleLogicalRangeChange(r => {
+        if (syncing || !r) return;
+        syncing = true;
+        b.timeScale().setVisibleLogicalRange(r);
+        syncing = false;
+    });
 }
-sync(priceChart,volumeChart);
-sync(volumeChart,priceChart);
+sync(priceChart, volumeChart);
+sync(volumeChart, priceChart);
 
 /* RESIZE */
-function resize(){
-  priceChart.resize(priceEl.clientWidth,320);
-  volumeChart.resize(volumeEl.clientWidth,100);
+function resize() {
+    // Используем offsetWidth родителя для правильного размера внутри рамки
+    if (priceEl.parentElement) {
+        priceChart.resize(priceEl.parentElement.offsetWidth, 320);
+    }
+    if (volumeEl.parentElement) {
+        volumeChart.resize(volumeEl.parentElement.offsetWidth, 100);
+    }
 }
-window.addEventListener('resize',resize);
+window.addEventListener('resize', resize);
 
-/* CANDLES */
+/* CANDLES LOGIC */
 function startNewCandle(time){
   currentNetVolume=0;
   currentCandle={time,open:price,high:price,low:price,close:price};
@@ -157,7 +244,7 @@ function updateCandle(){
   candleSeries.update(currentCandle);
 }
 
-/* TRADES */
+/* TRADES LOGIC */
 function recordTrade(usd,side){
   const delta=usd/LIQUIDITY;
   if(side==='BUY'){
@@ -182,14 +269,14 @@ function recordTrade(usd,side){
   volumeSeries.update({
     time: currentCandle.time + (2 * TIMEFRAME / 1000),
     value: currentNetVolume / 1e6,
-    color: currentNetVolume >= 0 ? '#1faa59' : '#d64545'
+    color: currentNetVolume >= 0 ? '#1fc77b' : '#e04b4b'
   });
 }
 
 /* MANUAL */
 function trade(side){
   ensureCandle();
-  recordTrade(+amount.value,side);
+  recordTrade(+document.getElementById('amount').value, side);
   updateCandle();
 }
 
@@ -215,7 +302,7 @@ updateCandle();
 
 priceChart.timeScale().fitContent();
 volumeChart.timeScale().fitContent();
-resize();
+resize(); // Инициализация размера
 
 setInterval(tick,300);
 </script>
