@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
-<title>BTC/USD Simulator + Net Volume</title>
+<title>BTC/USD Pro Simulator</title>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -14,8 +14,8 @@ body {
     margin: 0;
     background: #121417;
     color: #e6e6e6;
-    font-family: -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
-    overflow-y: auto; /* Скролл страницы разрешен */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow-y: auto;
     min-height: 100vh;
     padding-bottom: 40px;
     -webkit-tap-highlight-color: transparent;
@@ -29,55 +29,68 @@ body {
 }
 
 h3 {
-    margin: 15px 0 5px 0;
+    margin: 10px 0 5px 0;
     text-align: center;
     color: #fff;
     font-weight: 800;
+    letter-spacing: 1px;
 }
 .sub-title {
     text-align: center;
     font-size: 12px;
     color: #6b7280;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
-/* ===== ГРАФИКИ (Рамки и скругления) ===== */
+/* ===== СТАТИСТИКА (Balance HUD) ===== */
+.stats-bar {
+    display: flex;
+    justify-content: space-between;
+    background: #1e2228;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #1f2937;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 14px;
+}
+.stat-item { display: flex; flex-direction: column; }
+.stat-label { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+.stat-value { font-weight: 700; color: #fff; }
+.stat-value.usd { color: #1fc77b; }
+.stat-value.btc { color: #e6e6e6; }
+
+/* ===== ГРАФИКИ ===== */
 .chart-box {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 8px; /* Чуть строже углы */
     overflow: hidden;
     border: 1px solid #1f2937;
     position: relative;
-    margin-bottom: 10px;
+    margin-bottom: 5px; /* Уменьшил отступ между графиками */
     background: #121417;
 }
 
-#price { 
-    width: 100%; 
-    height: 320px; 
-}
-#volume { 
-    width: 100%; 
-    height: 100px; 
-}
+#price { width: 100%; height: 320px; }
+#volume { width: 100%; height: 100px; }
 
-/* ===== УПРАВЛЕНИЕ (Controls) ===== */
+/* ===== УПРАВЛЕНИЕ ===== */
 #controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 14px;
-    margin-top: 20px;
+    gap: 10px;
+    margin-top: 15px;
     background: #1e2228;
     padding: 15px;
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid #1f2937;
 }
 
 #amount {
-    width: 100px;
+    width: 80px;
     padding: 12px;
-    font-size: 18px;
+    font-size: 16px;
     text-align: center;
     background: #121417;
     border: 1px solid #374151;
@@ -88,28 +101,32 @@ h3 {
 }
 
 button {
-    padding: 12px 24px;
+    flex: 1; /* Кнопки занимают доступное место */
+    padding: 14px;
     font-size: 16px;
     font-weight: 800;
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: all 0.1s;
     color: #fff;
+    max-width: 120px;
 }
-button:active { transform: scale(0.96); }
+button:active { transform: translateY(2px); }
 
-/* Цвета кнопок под стиль графиков */
 .buy { 
     background: #1fc77b; 
-    color: #000; 
-    box-shadow: 0 4px 12px rgba(31, 199, 123, 0.2); 
+    color: #0d2e1f;
+    box-shadow: 0 4px 0px #158f58; /* Эффект 3D кнопки */
 }
+.buy:active { box-shadow: 0 0 0 #158f58; }
+
 .sell { 
     background: #e04b4b; 
-    color: #fff; 
-    box-shadow: 0 4px 12px rgba(224, 75, 75, 0.2); 
+    color: #380d0d;
+    box-shadow: 0 4px 0px #9e3333;
 }
+.sell:active { box-shadow: 0 0 0 #9e3333; }
 
 </style>
 </head>
@@ -117,8 +134,19 @@ button:active { transform: scale(0.96); }
 <body>
 
 <div class="wrapper">
-    <h3>BTC/USD SIMULATOR</h3>
-    <div class="sub-title">Interactive Market Logic</div>
+    <h3>BTC SIMULATOR</h3>
+    <div class="sub-title">Real-time Market Logic</div>
+
+    <div class="stats-bar">
+        <div class="stat-item">
+            <span class="stat-label">Balance USD</span>
+            <span class="stat-value usd" id="ui-usd">$100,000</span>
+        </div>
+        <div class="stat-item" style="text-align: right;">
+            <span class="stat-label">Holdings BTC</span>
+            <span class="stat-value btc" id="ui-btc">0.00 BTC</span>
+        </div>
+    </div>
 
     <div class="chart-box">
         <div id="price"></div>
@@ -130,7 +158,7 @@ button:active { transform: scale(0.96); }
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="1000">
+        <input id="amount" type="number" value="1000" step="100">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
@@ -140,7 +168,7 @@ button:active { transform: scale(0.96); }
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 
 /* ===== CONFIG & CONSTANTS ===== */
-const TIMEFRAME = 10000;
+const TIMEFRAME = 3000; // Ускорил таймфрейм до 3с для динамики (было 10с)
 const LIQUIDITY = 1_000_000;
 
 let price = 30000;
@@ -152,31 +180,39 @@ let currentCandle = null;
 let lastCandleTime = null;
 let currentNetVolume = 0;
 
-/* ===== CHART CONFIGURATION (Style from Code 1) ===== */
+/* ===== CHART CONFIGURATION ===== */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
-    grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+    grid: { 
+        vertLines: { color: '#1f2937', style: 2 }, // style 2 = пунктир
+        horzLines: { color: '#1f2937', style: 2 } 
+    },
     timeScale: { 
         timeVisible: true, 
-        secondsVisible: false, 
-        borderColor: '#1f2937' 
+        secondsVisible: true, // Включил секунды
+        borderColor: '#1f2937',
+        barSpacing: 12,     // ВАЖНО: Фиксированная ширина свечи (убирает мега-зум)
+        minBarSpacing: 2,
+        rightOffset: 10,    // Отступ справа, чтобы график не прилипал к краю
     },
-    // ВАЖНО: Настройки скролла и зума
-    handleScroll: { 
-        vertTouchDrag: false, // Разрешает вертикальный скролл страницы
-        horzTouchDrag: true 
+    crosshair: {
+        mode: 0, // Magnet mode
+        vertLine: { color: '#374151', labelBackgroundColor: '#374151' },
+        horzLine: { color: '#374151', labelBackgroundColor: '#374151' }
     },
-    handleScale: { 
-        pinch: true, // Разрешает зум пальцами
-        axisPressedMouseMove: true 
-    }
+    handleScroll: { vertTouchDrag: false, horzTouchDrag: true },
+    handleScale: { pinch: true, axisPressedMouseMove: true }
 };
 
 /* PRICE CHART */
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
-    rightPriceScale: { visible: false },
+    rightPriceScale: { 
+        visible: true, // Включили шкалу цены
+        borderColor: '#1f2937',
+        scaleMargins: { top: 0.1, bottom: 0.1 } // Отступы сверху/снизу
+    },
 });
 
 const candleSeries = priceChart.addCandlestickSeries({
@@ -190,18 +226,15 @@ const volumeEl = document.getElementById('volume');
 const volumeChart = LightweightCharts.createChart(volumeEl, {
     ...commonOpts,
     rightPriceScale: { visible: false },
-    leftPriceScale: { visible: false },
+    leftPriceScale: { visible: false }, // Объем без шкалы слева
 });
 
 const volumeSeries = volumeChart.addHistogramSeries({
-    base: 0,
-    priceFormat: {
-        type: 'custom',
-        formatter: v => v.toFixed(2) + 'M'
-    }
+    priceFormat: { type: 'volume' },
+    priceScaleId: ''
 });
 
-/* SYNC */
+/* SYNC LOGIC */
 let syncing = false;
 function sync(a, b) {
     a.timeScale().subscribeVisibleLogicalRangeChange(r => {
@@ -214,29 +247,39 @@ function sync(a, b) {
 sync(priceChart, volumeChart);
 sync(volumeChart, priceChart);
 
-/* RESIZE */
+/* RESIZE HANDLER */
 function resize() {
-    // Используем offsetWidth родителя для правильного размера внутри рамки
     if (priceEl.parentElement) {
-        priceChart.resize(priceEl.parentElement.offsetWidth, 320);
-    }
-    if (volumeEl.parentElement) {
-        volumeChart.resize(volumeEl.parentElement.offsetWidth, 100);
+        // -2 width для учета border (иногда помогает избежать скролла)
+        const w = priceEl.parentElement.offsetWidth;
+        priceChart.resize(w, 320);
+        volumeChart.resize(w, 100);
     }
 }
 window.addEventListener('resize', resize);
 
+/* UI UPDATER */
+function updateUI() {
+    // Форматирование чисел с запятыми
+    document.getElementById('ui-usd').innerText = '$' + balanceUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+    document.getElementById('ui-btc').innerText = balanceBTC.toFixed(4) + ' BTC';
+}
+
 /* CANDLES LOGIC */
 function startNewCandle(time){
   currentNetVolume=0;
-  currentCandle={time,open:price,high:price,low:price,close:price};
+  // Создаем новую свечу на уровне закрытия предыдущей
+  currentCandle={time, open:price, high:price, low:price, close:price};
+  
+  // При создании новой свечи сразу рисуем "пустой" объем, чтобы график не скакал
+  volumeSeries.update({ time: time, value: 0 });
 }
 
 function ensureCandle(){
-  const now=Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
-  if(!lastCandleTime||now>lastCandleTime){
+  const now = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
+  if(!lastCandleTime || now > lastCandleTime){
     startNewCandle(now/1000);
-    lastCandleTime=now;
+    lastCandleTime = now;
   }
 }
 
@@ -245,66 +288,102 @@ function updateCandle(){
 }
 
 /* TRADES LOGIC */
-function recordTrade(usd,side){
-  const delta=usd/LIQUIDITY;
-  if(side==='BUY'){
-    if(balanceUSD<usd) return;
-    balanceUSD-=usd;
-    balanceBTC+=usd/price;
-    price+=delta;
-    currentNetVolume+=usd;
-  }else{
-    const btc=usd/price;
-    if(balanceBTC<btc) return;
-    balanceBTC-=btc;
-    balanceUSD+=usd;
-    price-=delta;
-    currentNetVolume-=usd;
+function recordTrade(usd, side){
+  const delta = usd/LIQUIDITY;
+  
+  if(side === 'BUY'){
+    if(balanceUSD < usd) {
+        alert("Not enough USD!"); // Простейшая валидация
+        return;
+    }
+    balanceUSD -= usd;
+    balanceBTC += usd/price;
+    price += delta * (1 + Math.random()*0.5); // Немного рандома в движении
+    currentNetVolume += usd;
+  } else {
+    const btcNeeded = usd/price;
+    if(balanceBTC < btcNeeded) {
+        alert("Not enough BTC!"); 
+        return;
+    }
+    balanceBTC -= btcNeeded;
+    balanceUSD += usd;
+    price -= delta * (1 + Math.random()*0.5);
+    currentNetVolume -= usd;
   }
 
-  currentCandle.high=Math.max(currentCandle.high,price);
-  currentCandle.low=Math.min(currentCandle.low,price);
-  currentCandle.close=price;
+  // Обновляем High/Low свечи
+  currentCandle.high = Math.max(currentCandle.high, price);
+  currentCandle.low = Math.min(currentCandle.low, price);
+  currentCandle.close = price;
 
+  // Обновляем объем (ВРЕМЯ ТЕПЕРЬ СОВПАДАЕТ)
   volumeSeries.update({
-    time: currentCandle.time + (2 * TIMEFRAME / 1000),
+    time: currentCandle.time, 
+    value: currentNetVolume / 1e6, // В миллионах
+    color: currentNetVolume >= 0 ? 'rgba(31, 199, 123, 0.5)' : 'rgba(224, 75, 75, 0.5)'
+  });
+
+  updateUI();
+}
+
+/* MANUAL TRADE */
+function trade(side){
+  ensureCandle();
+  const amt = parseFloat(document.getElementById('amount').value) || 0;
+  if(amt > 0) {
+      recordTrade(amt, side);
+      updateCandle();
+  }
+}
+
+/* BOT / CROWD SIMULATION */
+function crowd(){
+  if(Math.random() < 0.3) return; // 30% шанс тишины
+  // Боты торгуют маленькими суммами
+  const amt = 100 + Math.random() * 2000;
+  const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
+  
+  // Логика цены (без изменения баланса пользователя)
+  const delta = amt/LIQUIDITY;
+  if (side === 'BUY') {
+      price += delta;
+      currentNetVolume += amt;
+  } else {
+      price -= delta;
+      currentNetVolume -= amt;
+  }
+  
+  currentCandle.high = Math.max(currentCandle.high, price);
+  currentCandle.low = Math.min(currentCandle.low, price);
+  currentCandle.close = price;
+  
+  volumeSeries.update({
+    time: currentCandle.time,
     value: currentNetVolume / 1e6,
-    color: currentNetVolume >= 0 ? '#1fc77b' : '#e04b4b'
+    color: currentNetVolume >= 0 ? 'rgba(31, 199, 123, 0.5)' : 'rgba(224, 75, 75, 0.5)'
   });
 }
 
-/* MANUAL */
-function trade(side){
-  ensureCandle();
-  recordTrade(+document.getElementById('amount').value, side);
-  updateCandle();
-}
-
-/* CROWD */
-function crowd(){
-  if(Math.random()<0.6) return;
-  recordTrade(50+Math.random()*500,Math.random()>0.5?'BUY':'SELL');
-}
-
-/* LOOP */
+/* MAIN LOOP */
 function tick(){
   ensureCandle();
   crowd();
   updateCandle();
-  lastPrice=price;
 }
 
-/* START */
-const start=Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
+/* INITIALIZATION */
+const start = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
 startNewCandle(start/1000);
-lastCandleTime=start;
+lastCandleTime = start;
 updateCandle();
+resize();
+updateUI();
 
-priceChart.timeScale().fitContent();
-volumeChart.timeScale().fitContent();
-resize(); // Инициализация размера
+// ВАЖНО: Мы НЕ вызываем fitContent(), чтобы сохранить barSpacing
 
-setInterval(tick,300);
+setInterval(tick, 200); // Обновление каждые 200мс
+
 </script>
 
 </body>
