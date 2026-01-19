@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Sim: Fixed Sync</title>
+<title>BTC: Real Wicks Logic</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     body {
@@ -69,8 +69,8 @@
 <body>
 
 <div class="wrapper">
-    <h3>WHALE SIMULATOR</h3>
-    <div class="sub-title">Mechanic: Huge Buy Wall Absorbs Sells</div>
+    <h3>MARKET MAKER SIM</h3>
+    <div class="sub-title">Dump the price -> Watch Crowd "Buy the Dip"</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -87,7 +87,7 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="10000" step="1000">
+        <input id="amount" type="number" value="20000" step="1000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
@@ -95,11 +95,11 @@
 <script>
 const TIMEFRAME = 15000;
 
-/* ===== МЕХАНИКА ===== */
-const BUY_LIQUIDITY = 2_000; 
-const SELL_LIQUIDITY = 40_000; 
+/* ===== REAL MECHANICS ===== */
+// Ликвидность умеренная, чтобы твои продажи двигали цену
+const LIQUIDITY = 4_000; 
 
-let price = 10; 
+let price = 100; 
 let balanceUSD = 1_000_000; 
 let balanceBTC = 1000; 
 
@@ -108,7 +108,7 @@ let lastCandleTime = null;
 let volBuy = 0;
 let volSell = 0;
 
-/* ===== НАСТРОЙКИ ГРАФИКОВ ===== */
+/* ===== CHARTS ===== */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
@@ -120,38 +120,24 @@ const commonOpts = {
     kineticScroll: { touch: true, mouse: true }
 };
 
-/* ===== PRICE CHART ===== */
 const priceEl = document.getElementById('price');
 const priceChart = LightweightCharts.createChart(priceEl, {
     ...commonOpts,
-    rightPriceScale: { 
-        visible: true, 
-        borderColor: '#1f2937', 
-        autoScale: true,
-        // ВАЖНО: Фиксируем ширину шкалы, чтобы графики не разъезжались
-        minimumWidth: 75, 
-    },
+    rightPriceScale: { visible: true, borderColor: '#1f2937', autoScale: true, minimumWidth: 75 },
 });
 const candleSeries = priceChart.addCandlestickSeries({
     upColor: '#1fc77b', downColor: '#e04b4b', borderUpColor: '#1fc77b', borderDownColor: '#e04b4b', wickUpColor: '#1fc77b', wickDownColor: '#e04b4b'
 });
 
-/* ===== VOLUME CHART ===== */
 const volumeEl = document.getElementById('volume');
 const volumeChart = LightweightCharts.createChart(volumeEl, {
     ...commonOpts,
-    rightPriceScale: { 
-        visible: true, 
-        borderColor: '#1f2937',
-        // ВАЖНО: Такая же ширина шкалы, как у цены
-        minimumWidth: 75,
-    }, 
+    rightPriceScale: { visible: true, borderColor: '#1f2937', minimumWidth: 75 }, 
 });
 const volumeSeries = volumeChart.addHistogramSeries({
     priceFormat: { type: 'volume' }, priceScaleId: 'right',
 });
 
-/* ===== СИНХРОНИЗАЦИЯ ===== */
 function sync(a, b) {
     const s1 = a.timeScale(), s2 = b.timeScale();
     s1.subscribeVisibleLogicalRangeChange(r => { if(r) s2.setVisibleLogicalRange(r) });
@@ -167,7 +153,7 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-/* ===== UI & LOGIC ===== */
+/* ===== LOGIC ===== */
 const uiUsd = document.getElementById('ui-usd');
 const uiBtc = document.getElementById('ui-btc');
 const uiVolBuy = document.getElementById('ui-vol-buy');
@@ -205,33 +191,28 @@ function ensureCandle(){
 }
 
 function recordTrade(usd, side){
-    let deltaPrice = 0;
+    const deltaPrice = usd / LIQUIDITY;
 
     if(side === 'BUY'){
         if(balanceUSD < usd) return;
         balanceUSD -= usd; 
         balanceBTC += usd/price;
-        volBuy += usd;
-        
-        // Покупки сильно двигают цену (легкий рынок)
-        deltaPrice = usd / BUY_LIQUIDITY;
         price += deltaPrice;
-        
+        volBuy += usd;
     } else {
         const btcNeeded = usd/price;
         if(balanceBTC < btcNeeded) return;
         balanceBTC -= btcNeeded; 
         balanceUSD += usd;
-        volSell += usd;
-
-        // Продажи почти НЕ двигают цену (Стена покупателя)
-        deltaPrice = usd / SELL_LIQUIDITY;
         price -= deltaPrice;
+        volSell += usd;
     }
 
+    // РЕАЛЬНЫЕ ТЕНИ: Просто обновляем High/Low исходя из новой цены
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
     currentCandle.close = price;
+    
     candleSeries.update(currentCandle);
     updateVolume(currentCandle.time);
     updateUI();
@@ -243,19 +224,37 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC === */
+/* === CROWD LOGIC: "BUY THE DIP" === */
 function crowd(){
-    if(Math.random() < 0.1) return; 
+    // Боты активны часто (каждые 0.2с)
+    if(Math.random() < 0.05) return; 
 
-    const amt = 100 + Math.random() * 500; 
-    const side = 'BUY'; 
+    // Базовая покупка
+    let amt = 100 + Math.random() * 500;
     
-    // Толпа покупает с высокой эффективностью (маленькая ликвидность на продажу)
-    const deltaPrice = amt / BUY_LIQUIDITY;
+    // АНАЛИЗ ГЛУБИНЫ ПАДЕНИЯ
+    // Считаем % изменения цены от открытия свечи
+    const changePct = (price - currentCandle.open) / currentCandle.open;
+    
+    // Если цена упала (changePct отрицательный)
+    if (changePct < 0) {
+        // Логика "Откупа дна": Чем сильнее упало, тем сильнее покупаем
+        // Например: упало на 10% (-0.1). panicFactor = 10. Multiplier = 1 + 20 = 21x
+        
+        const panicFactor = Math.abs(changePct) * 100; // коэффициент падения
+        const multiplier = 1 + (panicFactor * 2); 
+        
+        amt = amt * multiplier; // Увеличиваем объем покупки
+    }
+
+    const side = 'BUY'; 
+    const deltaPrice = amt / LIQUIDITY;
 
     price += deltaPrice;
     volBuy += amt;
 
+    // Обновление свечи (реальные тени формируются тут)
+    // Если цена была на дне (Low), а теперь выросла, Low останется внизу, Close поднимется -> Тень!
     currentCandle.high = Math.max(currentCandle.high, price);
     currentCandle.low = Math.min(currentCandle.low, price);
     currentCandle.close = price;
