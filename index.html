@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC: Real Wicks Logic</title>
+<title>BTC Sim: Asymmetric Liquidity</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     body {
@@ -69,8 +69,8 @@
 <body>
 
 <div class="wrapper">
-    <h3>MARKET MAKER SIM</h3>
-    <div class="sub-title">Dump the price -> Watch Crowd "Buy the Dip"</div>
+    <h3>ASYMMETRIC MARKET</h3>
+    <div class="sub-title">Thin Ask (Up is Easy) vs Thick Bid (Down is Hard)</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -87,7 +87,7 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="20000" step="1000">
+        <input id="amount" type="number" value="10000" step="1000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
@@ -95,9 +95,16 @@
 <script>
 const TIMEFRAME = 15000;
 
-/* ===== REAL MECHANICS ===== */
-// Ликвидность умеренная, чтобы твои продажи двигали цену
-const LIQUIDITY = 4_000; 
+/* ===== АСИММЕТРИЯ СТАКАНА ===== */
+// 1. Сопротивление падению (BID WALL). 
+// Высокое значение = нужно много денег, чтобы продавить вниз.
+// Это позволяет тебе налить $10,000 красного объема, но цена упадет не так сильно.
+const DOWN_RESISTANCE = 2000; 
+
+// 2. Сопротивление росту (ASK WALL).
+// Низкое значение = "нет продаж", цена летит вверх от малейшего чиха.
+// Это позволяет толпе на $1,000 перебить твое падение и сделать свечу зеленой.
+const UP_RESISTANCE = 150; 
 
 let price = 100; 
 let balanceUSD = 1_000_000; 
@@ -108,7 +115,7 @@ let lastCandleTime = null;
 let volBuy = 0;
 let volSell = 0;
 
-/* ===== CHARTS ===== */
+/* ===== GRAPHICS ===== */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
@@ -166,6 +173,15 @@ function updateUI() {
     uiVolSell.innerText = '$' + Math.floor(volSell).toLocaleString('en-US');
 }
 
+function updateCandleHighLowWithNoise(nowPrice) {
+    const noise = nowPrice * (0.0001 + Math.random() * 0.0005); 
+    const potentialHigh = nowPrice + noise;
+    const potentialLow = nowPrice - noise;
+    currentCandle.high = Math.max(currentCandle.high, potentialHigh);
+    currentCandle.low = Math.min(currentCandle.low, potentialLow);
+    currentCandle.close = nowPrice;
+}
+
 function startNewCandle(time){
     volBuy = 0; volSell = 0;
     currentCandle = {time, open:price, high:price, low:price, close:price};
@@ -191,28 +207,31 @@ function ensureCandle(){
 }
 
 function recordTrade(usd, side){
-    const deltaPrice = usd / LIQUIDITY;
+    let deltaPrice = 0;
 
     if(side === 'BUY'){
         if(balanceUSD < usd) return;
         balanceUSD -= usd; 
         balanceBTC += usd/price;
-        price += deltaPrice;
         volBuy += usd;
+        
+        // Покупка летит вверх легко (UP_RESISTANCE мал)
+        deltaPrice = usd / UP_RESISTANCE;
+        price += deltaPrice;
+        
     } else {
         const btcNeeded = usd/price;
         if(balanceBTC < btcNeeded) return;
         balanceBTC -= btcNeeded; 
         balanceUSD += usd;
-        price -= deltaPrice;
         volSell += usd;
+
+        // Продажа идет туго (DOWN_RESISTANCE велик)
+        deltaPrice = usd / DOWN_RESISTANCE;
+        price -= deltaPrice;
     }
 
-    // РЕАЛЬНЫЕ ТЕНИ: Просто обновляем High/Low исходя из новой цены
-    currentCandle.high = Math.max(currentCandle.high, price);
-    currentCandle.low = Math.min(currentCandle.low, price);
-    currentCandle.close = price;
-    
+    updateCandleHighLowWithNoise(price);
     candleSeries.update(currentCandle);
     updateVolume(currentCandle.time);
     updateUI();
@@ -224,41 +243,21 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC: "BUY THE DIP" === */
+/* === CROWD LOGIC === */
 function crowd(){
-    // Боты активны часто (каждые 0.2с)
-    if(Math.random() < 0.05) return; 
+    if(Math.random() < 0.1) return; 
 
-    // Базовая покупка
-    let amt = 100 + Math.random() * 500;
+    // Толпа покупает совсем чуть-чуть ($100 - $500)
+    const amt = 100 + Math.random() * 400; 
     
-    // АНАЛИЗ ГЛУБИНЫ ПАДЕНИЯ
-    // Считаем % изменения цены от открытия свечи
-    const changePct = (price - currentCandle.open) / currentCandle.open;
+    // Но так как UP_RESISTANCE (150) в 13 раз меньше DOWN_RESISTANCE (2000),
+    // эти $500 толкнут цену сильнее, чем твои $5000 продажи.
     
-    // Если цена упала (changePct отрицательный)
-    if (changePct < 0) {
-        // Логика "Откупа дна": Чем сильнее упало, тем сильнее покупаем
-        // Например: упало на 10% (-0.1). panicFactor = 10. Multiplier = 1 + 20 = 21x
-        
-        const panicFactor = Math.abs(changePct) * 100; // коэффициент падения
-        const multiplier = 1 + (panicFactor * 2); 
-        
-        amt = amt * multiplier; // Увеличиваем объем покупки
-    }
-
-    const side = 'BUY'; 
-    const deltaPrice = amt / LIQUIDITY;
-
+    const deltaPrice = amt / UP_RESISTANCE;
     price += deltaPrice;
     volBuy += amt;
 
-    // Обновление свечи (реальные тени формируются тут)
-    // Если цена была на дне (Low), а теперь выросла, Low останется внизу, Close поднимется -> Тень!
-    currentCandle.high = Math.max(currentCandle.high, price);
-    currentCandle.low = Math.min(currentCandle.low, price);
-    currentCandle.close = price;
-    
+    updateCandleHighLowWithNoise(price);
     candleSeries.update(currentCandle);
     updateVolume(currentCandle.time);
     updateUI();
