@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>BTC Sim: Asymmetric Liquidity</title>
+<title>SOLO TRADER: Asymmetric Liquidity</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
     body {
@@ -13,6 +13,7 @@
         -webkit-tap-highlight-color: transparent;
     }
     .wrapper { max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
+    
     h3 { margin: 15px 0 5px 0; text-align: center; color: #fff; font-weight: 800; letter-spacing: 1px; }
     .sub-title { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 10px; }
 
@@ -69,8 +70,8 @@
 <body>
 
 <div class="wrapper">
-    <h3>ASYMMETRIC MARKET</h3>
-    <div class="sub-title">Thin Ask (Up is Easy) vs Thick Bid (Down is Hard)</div>
+    <h3>SOLO MODE</h3>
+    <div class="sub-title">No Bots. You vs The Liquidity.</div>
 
     <div class="stats-bar">
         <div>USD: <span class="stat-val usd" id="ui-usd">$1,000,000</span></div>
@@ -87,7 +88,7 @@
 
     <div id="controls">
         <button class="buy" onclick="trade('BUY')">BUY</button>
-        <input id="amount" type="number" value="10000" step="1000">
+        <input id="amount" type="number" value="5000" step="1000">
         <button class="sell" onclick="trade('SELL')">SELL</button>
     </div>
 </div>
@@ -95,15 +96,11 @@
 <script>
 const TIMEFRAME = 15000;
 
-/* ===== АСИММЕТРИЯ СТАКАНА ===== */
-// 1. Сопротивление падению (BID WALL). 
-// Высокое значение = нужно много денег, чтобы продавить вниз.
-// Это позволяет тебе налить $10,000 красного объема, но цена упадет не так сильно.
+/* ===== CONFIG: ASYMMETRIC LIQUIDITY ===== */
+// Вниз идти ТЯЖЕЛО (надо много продавать)
 const DOWN_RESISTANCE = 2000; 
 
-// 2. Сопротивление росту (ASK WALL).
-// Низкое значение = "нет продаж", цена летит вверх от малейшего чиха.
-// Это позволяет толпе на $1,000 перебить твое падение и сделать свечу зеленой.
+// Вверх идти ЛЕГКО (надо мало покупать)
 const UP_RESISTANCE = 150; 
 
 let price = 100; 
@@ -115,7 +112,7 @@ let lastCandleTime = null;
 let volBuy = 0;
 let volSell = 0;
 
-/* ===== GRAPHICS ===== */
+/* ===== CHARTS ===== */
 const commonOpts = {
     layout: { background: { color: '#121417' }, textColor: '#9ca3af' },
     grid: { vertLines: { color: '#1f2937', style: 2 }, horzLines: { color: '#1f2937', style: 2 } },
@@ -173,6 +170,7 @@ function updateUI() {
     uiVolSell.innerText = '$' + Math.floor(volSell).toLocaleString('en-US');
 }
 
+// Добавляем немного шума только при сделке, чтобы рисовать тени
 function updateCandleHighLowWithNoise(nowPrice) {
     const noise = nowPrice * (0.0001 + Math.random() * 0.0005); 
     const potentialHigh = nowPrice + noise;
@@ -215,7 +213,7 @@ function recordTrade(usd, side){
         balanceBTC += usd/price;
         volBuy += usd;
         
-        // Покупка летит вверх легко (UP_RESISTANCE мал)
+        // Вверх летит легко
         deltaPrice = usd / UP_RESISTANCE;
         price += deltaPrice;
         
@@ -226,7 +224,7 @@ function recordTrade(usd, side){
         balanceUSD += usd;
         volSell += usd;
 
-        // Продажа идет туго (DOWN_RESISTANCE велик)
+        // Вниз идет с трудом
         deltaPrice = usd / DOWN_RESISTANCE;
         price -= deltaPrice;
     }
@@ -243,25 +241,7 @@ function trade(side){
     if(val > 0) recordTrade(val, side);
 }
 
-/* === CROWD LOGIC === */
-function crowd(){
-    if(Math.random() < 0.1) return; 
-
-    // Толпа покупает совсем чуть-чуть ($100 - $500)
-    const amt = 100 + Math.random() * 400; 
-    
-    // Но так как UP_RESISTANCE (150) в 13 раз меньше DOWN_RESISTANCE (2000),
-    // эти $500 толкнут цену сильнее, чем твои $5000 продажи.
-    
-    const deltaPrice = amt / UP_RESISTANCE;
-    price += deltaPrice;
-    volBuy += amt;
-
-    updateCandleHighLowWithNoise(price);
-    candleSeries.update(currentCandle);
-    updateVolume(currentCandle.time);
-    updateUI();
-}
+// Нет функции crowd()
 
 const start = Math.floor(Date.now()/TIMEFRAME)*TIMEFRAME;
 startNewCandle(start/1000);
@@ -269,10 +249,12 @@ lastCandleTime = start;
 updateUI();
 resize();
 
+// Цикл только для обновления времени (чтобы свечи сменялись)
 setInterval(() => {
     ensureCandle();
-    crowd();
+    // Больше ничего не делаем, ботов нет
 }, 200);
+
 </script>
 </body>
 </html>
